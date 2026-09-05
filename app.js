@@ -163,15 +163,25 @@ async function extractFromPageText(pageText, url) {
 
 /* ---------- Récupération du contenu d'une page web ---------- */
 
+async function fetchWithTimeout(url, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchPageText(url) {
   const proxies = [
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    `https://corsproxy.io/?url=${encodeURIComponent(url)}`
+    `https://thingproxy.freeboard.io/fetch/${url}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
   ];
   let lastErr;
   for (const proxyUrl of proxies) {
     try {
-      const res = await fetch(proxyUrl);
+      const res = await fetchWithTimeout(proxyUrl, 12000);
       if (!res.ok) throw new Error(`${res.status}`);
       const html = await res.text();
       const doc = new DOMParser().parseFromString(html, "text/html");
