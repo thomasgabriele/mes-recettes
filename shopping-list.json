@@ -1,0 +1,140 @@
+{
+  "items": [
+    {
+      "quantity": 1,
+      "unit": "cuillère",
+      "name": "à soupe de miel ou sucrant au choix (si version vegan : sirop d'érable ou sirop d'agave)",
+      "recipes": [
+        "Brioche nuage aux blancs d'œufs et pépites de chocolat"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 250,
+      "unit": "g",
+      "name": "beurre doux ramolli",
+      "recipes": [
+        "Gaufre Liégeoise Croustillante & Moelleuse"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 1,
+      "unit": "petite",
+      "name": "cuillère à café rase de levure chimique (environ 4 g)",
+      "recipes": [
+        "Brioche nuage aux blancs d'œufs et pépites de chocolat"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 1,
+      "unit": "grosse",
+      "name": "cuillère à soupe de Maïzena (environ 12 g)",
+      "recipes": [
+        "Brioche nuage aux blancs d'œufs et pépites de chocolat"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 3,
+      "unit": "cuillères à café",
+      "name": "extrait naturel de vanille",
+      "recipes": [
+        "Gaufre Liégeoise Croustillante & Moelleuse"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 500,
+      "unit": "g",
+      "name": "farine T55 ou T45",
+      "recipes": [
+        "Gaufre Liégeoise Croustillante & Moelleuse"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 250,
+      "unit": "ml",
+      "name": "lait",
+      "recipes": [
+        "Gaufre Liégeoise Croustillante & Moelleuse"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 8,
+      "unit": "g",
+      "name": "levure sèche boulangère",
+      "recipes": [
+        "Gaufre Liégeoise Croustillante & Moelleuse"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 2,
+      "unit": "",
+      "name": "oeufs",
+      "recipes": [
+        "Gaufre Liégeoise Croustillante & Moelleuse"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 5,
+      "unit": "blancs",
+      "name": "œufs (à température ambiante)",
+      "recipes": [
+        "Brioche nuage aux blancs d'œufs et pépites de chocolat"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 60,
+      "unit": "g",
+      "name": "pépites de chocolat (noir de préférence)",
+      "recipes": [
+        "Brioche nuage aux blancs d'œufs et pépites de chocolat"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": null,
+      "unit": "",
+      "name": "Quelques gouttes de vanille liquide",
+      "recipes": [
+        "Brioche nuage aux blancs d'œufs et pépites de chocolat"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 2,
+      "unit": "pincées",
+      "name": "sel",
+      "recipes": [
+        "Gaufre Liégeoise Croustillante & Moelleuse"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 35,
+      "unit": "g",
+      "name": "sucre cassonade",
+      "recipes": [
+        "Gaufre Liégeoise Croustillante & Moelleuse"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 160,
+      "unit": "g",
+      "name": "sucre perlé",
+      "recipes": [
+        "Gaufre Liégeoise Croustillante & Moelleuse"
+      ],
+      "checked": false
+    }
+  ],
+  "updatedAt": "2026-09-05T17:42:14.077Z"
+}
