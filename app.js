@@ -176,10 +176,13 @@ const EXTRACTION_INSTRUCTIONS = `Tu extrais une recette de cuisine et tu répond
 }
 Chaque ingrédient est une seule ligne de texte (quantité + unité + nom, ex: "200 g de farine"). Chaque étape est une phrase claire et complète. Si une information est absente de la source, laisse une chaîne vide plutôt que d'inventer.`;
 
+const IMAGE_EXTRA_INSTRUCTION = `
+Ajoute aussi un champ "isDishPhoto": true si la photo montre le plat cuisiné fini (le résultat à manger), ou false si la photo montre autre chose (une recette écrite, un livre, un écran, un emballage, des ingrédients bruts, etc).`;
+
 async function extractFromImage(base64, mediaType) {
   return callClaude([
     { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
-    { type: "text", text: EXTRACTION_INSTRUCTIONS }
+    { type: "text", text: EXTRACTION_INSTRUCTIONS + IMAGE_EXTRA_INSTRUCTION }
   ]);
 }
 
@@ -581,7 +584,12 @@ function wireEvents() {
       const { base64, dataUrl } = await readAndResizeImage(file);
       $("import-loading-text").textContent = "Analyse par l'IA…";
       const data = await extractFromImage(base64, "image/jpeg");
-      data.photo = dataUrl;
+      if (data.isDishPhoto === false) {
+        $("import-loading-text").textContent = "Recherche d'une photo du plat…";
+        data.photo = (await findImageViaWebSearch(data.title)) || dataUrl;
+      } else {
+        data.photo = dataUrl;
+      }
       showReview(data, { type: "photo" });
     } catch (e) {
       showToast("Erreur : " + e.message, true);
