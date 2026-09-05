@@ -18,8 +18,8 @@ let currentCategoryFilter = ""; // catégorie sélectionnée dans la liste ("" =
 let currentDifficultyFilter = ""; // difficulté sélectionnée ("" = toutes)
 let currentSearchQuery = "";
 let currentPrepTimeMax = ""; // minutes, "" = toute durée
-let selectionMode = false;
 let selectedIndices = new Set();
+let currentDetailIndex = null; // index de la recette affichée dans le panneau détail
 let detailServings = null; // portions actuellement affichées dans le détail
 let currentShoppingList = null; // { items: [...] }
 let currentShoppingListSha = null;
@@ -326,7 +326,7 @@ function readAndResizeImage(file, maxWidth = 1100, quality = 0.8) {
 
 async function refreshRecipeList() {
   $("loading-state").classList.remove("hidden");
-  $("recipe-grid").classList.add("hidden");
+  $("app-layout").classList.add("hidden");
   $("empty-state").classList.add("hidden");
   try {
     const files = await ghListRecipeFiles();
@@ -355,7 +355,34 @@ function getCategories(recipes) {
     .sort((a, b) => a.localeCompare(b, "fr"));
 }
 
-function renderChipBar(barEl, values, current, onPick) {
+const CATEGORY_PALETTE = [
+  { bg: "#FBEFD9", fg: "#8A5A15" },
+  { bg: "#E4EFE6", fg: "#2F6B45" },
+  { bg: "#E8EEF7", fg: "#31537E" },
+  { bg: "#F6E6EC", fg: "#8C3455" },
+  { bg: "#EDE7F6", fg: "#5B3B8C" },
+  { bg: "#FDEBE3", fg: "#9C4A22" },
+  { bg: "#E3F2F1", fg: "#1F6B66" },
+  { bg: "#F2E9DD", fg: "#6B4A28" }
+];
+
+function categoryColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return CATEGORY_PALETTE[hash % CATEGORY_PALETTE.length];
+}
+
+const DIFFICULTY_COLORS = {
+  Facile: { bg: "#E4EFE6", fg: "#2F6B45" },
+  Moyen: { bg: "#FBEFD9", fg: "#8A5A15" },
+  Difficile: { bg: "#FBE4E1", fg: "#A23B2E" }
+};
+
+function badgePill(label, colors) {
+  return `<span class="badge-pill" style="background:${colors.bg};color:${colors.fg}">${escapeHtml(label)}</span>`;
+}
+
+function renderChipBar(barEl, values, current, onPick, colorFn) {
   if (values.length === 0) {
     barEl.classList.add("hidden");
     barEl.innerHTML = "";
@@ -368,6 +395,12 @@ function renderChipBar(barEl, values, current, onPick) {
     chip.type = "button";
     chip.className = "category-chip" + (current === value ? " active" : "");
     chip.textContent = label;
+    if (colorFn && value && current !== value) {
+      const c = colorFn(value);
+      chip.style.background = c.bg;
+      chip.style.color = c.fg;
+      chip.style.borderColor = "transparent";
+    }
     chip.addEventListener("click", () => onPick(value));
     return chip;
   };
@@ -382,7 +415,7 @@ function renderCategoryFilters(recipes) {
     currentCategoryFilter = v;
     applyRecipeFilter();
     renderCategoryFilters(currentRecipes);
-  });
+  }, categoryColor);
 }
 
 function renderDifficultyFilters(recipes) {
@@ -391,7 +424,7 @@ function renderDifficultyFilters(recipes) {
     currentDifficultyFilter = v;
     applyRecipeFilter();
     renderDifficultyFilters(currentRecipes);
-  });
+  }, (d) => DIFFICULTY_COLORS[d]);
 }
 
 function matchesSearch(r, query) {
@@ -410,10 +443,11 @@ function applyRecipeFilter() {
 
   if (recipes.length === 0) {
     $("empty-state").classList.remove("hidden");
-    $("recipe-grid").classList.add("hidden");
+    $("app-layout").classList.add("hidden");
     return;
   }
   $("empty-state").classList.add("hidden");
+  $("app-layout").classList.remove("hidden");
 
   const filtered = recipes.filter(r => {
     if (currentCategoryFilter && (r.data.category || "").trim() !== currentCategoryFilter) return false;
@@ -431,33 +465,39 @@ function applyRecipeFilter() {
   filtered.forEach((r) => {
     const index = currentRecipes.indexOf(r);
     const card = document.createElement("div");
-    card.className = "recipe-card";
+    card.className = "recipe-card" + (index === currentDetailIndex ? " active" : "");
     const meta = [r.data.prepTime, r.data.cookTime, r.data.servings].filter(Boolean);
-    const photoHtml = r.data.photo ? `<img class="recipe-card-photo" src="${escapeHtml(r.data.photo)}" alt="">` : "";
-    const categoryHtml = r.data.category ? `<span class="recipe-card-category">${escapeHtml(r.data.category)}</span>` : "";
-    const difficultyHtml = r.data.difficulty ? `<span class="recipe-card-difficulty">${escapeHtml(r.data.difficulty)}</span>` : "";
-    const selectHtml = selectionMode ? `<div class="card-select-box">${selectedIndices.has(index) ? "☑" : "☐"}</div>` : "";
-    card.innerHTML = `${selectHtml}${photoHtml}${categoryHtml}${difficultyHtml}<h3>${escapeHtml(r.data.title || "Sans titre")}</h3>
-      <div class="recipe-meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join("")}</div>`;
-    card.addEventListener("click", () => {
-      if (selectionMode) toggleSelection(index);
-      else openRecipeDetail(index);
-    });
+    const photoHtml = r.data.photo
+      ? `<img class="recipe-card-thumb" src="${escapeHtml(r.data.photo)}" alt="">`
+      : `<div class="recipe-card-thumb"></div>`;
+    const categoryHtml = r.data.category ? badgePill(r.data.category, categoryColor(r.data.category)) : "";
+    const difficultyHtml = r.data.difficulty ? badgePill(r.data.difficulty, DIFFICULTY_COLORS[r.data.difficulty]) : "";
+    const badgesHtml = (categoryHtml || difficultyHtml) ? `<div class="card-badges">${categoryHtml}${difficultyHtml}</div>` : "";
+    card.innerHTML = `
+      <label class="recipe-card-checkbox"><input type="checkbox" data-index="${index}" ${selectedIndices.has(index) ? "checked" : ""}></label>
+      ${photoHtml}
+      <div class="recipe-card-info">
+        ${badgesHtml}
+        <h3>${escapeHtml(r.data.title || "Sans titre")}</h3>
+        <div class="recipe-meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join("")}</div>
+      </div>
+    `;
+    card.querySelector(".recipe-card-checkbox").addEventListener("click", (e) => e.stopPropagation());
+    card.querySelector(".recipe-card-checkbox input").addEventListener("change", () => toggleSelection(index));
+    card.addEventListener("click", () => openRecipeDetail(index));
     grid.appendChild(card);
   });
-  grid.classList.remove("hidden");
 }
 
 function toggleSelection(index) {
   if (selectedIndices.has(index)) selectedIndices.delete(index);
   else selectedIndices.add(index);
-  applyRecipeFilter();
   updateSelectionBar();
 }
 
 function updateSelectionBar() {
   const bar = $("selection-bar");
-  if (!selectionMode) { bar.classList.add("hidden"); return; }
+  if (selectedIndices.size === 0) { bar.classList.add("hidden"); return; }
   bar.classList.remove("hidden");
   $("selection-count").textContent = `${selectedIndices.size} sélectionnée(s)`;
 }
@@ -520,11 +560,23 @@ function getBaseServings(d) {
 }
 
 function openRecipeDetail(index) {
+  currentDetailIndex = index;
   const r = currentRecipes[index];
   const base = getBaseServings(r.data);
   detailServings = base || null;
   renderRecipeDetailContent(r);
-  showView("view-detail");
+  $("detail-placeholder").classList.add("hidden");
+  $("detail-content").classList.remove("hidden");
+  $("detail-pane").classList.add("open");
+  applyRecipeFilter();
+}
+
+function closeRecipeDetail() {
+  currentDetailIndex = null;
+  $("detail-pane").classList.remove("open");
+  $("detail-placeholder").classList.remove("hidden");
+  $("detail-content").classList.add("hidden");
+  applyRecipeFilter();
 }
 
 function renderRecipeDetailContent(r) {
@@ -535,12 +587,13 @@ function renderRecipeDetailContent(r) {
     d.prepTime && `Préparation : ${d.prepTime}`,
     d.cookTime && `Cuisson : ${d.cookTime}`
   ].filter(Boolean);
+  const categoryHtml = d.category ? badgePill(d.category, categoryColor(d.category)) : "";
+  const difficultyHtml = d.difficulty ? badgePill(d.difficulty, DIFFICULTY_COLORS[d.difficulty]) : "";
 
   $("detail-content").innerHTML = `
     ${d.photo ? `<img class="detail-photo" src="${escapeHtml(d.photo)}" alt="">` : ""}
     <div class="detail-header">
-      ${d.category ? `<span class="recipe-card-category">${escapeHtml(d.category)}</span>` : ""}
-      ${d.difficulty ? `<span class="recipe-card-difficulty">${escapeHtml(d.difficulty)}</span>` : ""}
+      ${(categoryHtml || difficultyHtml) ? `<div class="card-badges">${categoryHtml}${difficultyHtml}</div>` : ""}
       <h2>${escapeHtml(d.title || "Sans titre")}</h2>
       <div class="detail-meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join("")}</div>
       ${d.source && d.source.url ? `<div class="detail-source">Source : <a href="${escapeHtml(d.source.url)}" target="_blank" rel="noopener">${escapeHtml(d.source.url)}</a></div>` : ""}
@@ -583,7 +636,7 @@ async function deleteCurrentRecipe(r) {
   try {
     await ghDeleteFile(r.path, r.sha);
     showToast("Recette supprimée");
-    showView("view-list");
+    closeRecipeDetail();
     refreshRecipeList();
   } catch (e) {
     showToast("Erreur : " + e.message, true);
@@ -726,7 +779,7 @@ async function saveReviewedRecipe() {
     showToast(editing ? "Recette mise à jour" : "Recette enregistrée");
     closeModal("modal-import");
     resetImportModal();
-    showView("view-list");
+    closeRecipeDetail();
     refreshRecipeList();
   } catch (e) {
     showToast("Erreur : " + e.message, true);
@@ -771,14 +824,66 @@ function renderShoppingList(list) {
     return;
   }
   container.innerHTML = list.items.map((it, i) => `
-    <label class="shopping-item ${it.checked ? "checked" : ""}">
-      <input type="checkbox" data-index="${i}" ${it.checked ? "checked" : ""}>
-      <span>
-        ${escapeHtml((it.quantity != null ? formatQty(it.quantity) + (it.unit ? " " + it.unit : "") + " " : "") + it.name)}
-        <span class="shopping-item-recipes">${escapeHtml(it.recipes.join(", "))}</span>
-      </span>
-    </label>
+    <div class="shopping-item ${it.checked ? "checked" : ""}">
+      <label class="shopping-item-main">
+        <input type="checkbox" data-index="${i}" ${it.checked ? "checked" : ""}>
+        <span>
+          ${escapeHtml((it.quantity != null ? formatQty(it.quantity) + (it.unit ? " " + it.unit : "") + " " : "") + it.name)}
+          <span class="shopping-item-recipes">${escapeHtml(it.recipes.join(", "))}</span>
+        </span>
+      </label>
+      <button type="button" class="btn btn-icon shopping-item-remove" data-index="${i}" title="Supprimer">✕</button>
+    </div>
   `).join("");
+}
+
+/* ---------- Export vers Rappels (iOS) ---------- */
+
+function icsEscape(s) {
+  return String(s).replace(/([,;\\])/g, "\\$1").replace(/\n/g, "\\n");
+}
+
+function buildIcsFromShoppingList(list) {
+  const now = new Date();
+  const dtstamp = now.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Mes Recettes//Liste de courses//FR"
+  ];
+  (list.items || []).forEach((it, i) => {
+    const label = (it.quantity != null ? formatQty(it.quantity) + (it.unit ? " " + it.unit : "") + " " : "") + it.name;
+    lines.push("BEGIN:VTODO");
+    lines.push(`UID:mesrecettes-${now.getTime()}-${i}@mesrecettes`);
+    lines.push(`DTSTAMP:${dtstamp}`);
+    lines.push(`SUMMARY:${icsEscape(label)}`);
+    if (it.checked) {
+      lines.push("STATUS:COMPLETED");
+      lines.push("PERCENT-COMPLETE:100");
+    } else {
+      lines.push("STATUS:NEEDS-ACTION");
+    }
+    lines.push("END:VTODO");
+  });
+  lines.push("END:VCALENDAR");
+  return lines.join("\r\n");
+}
+
+function exportShoppingListToIcs() {
+  if (!currentShoppingList || !currentShoppingList.items || currentShoppingList.items.length === 0) {
+    showToast("Liste vide", true);
+    return;
+  }
+  const ics = buildIcsFromShoppingList(currentShoppingList);
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "liste-de-courses.ics";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 /* ---------- Câblage des événements ---------- */
@@ -793,7 +898,7 @@ function wireEvents() {
     $("input-gh-token").value = settings.ghToken || "";
     openModal("modal-settings");
   });
-  $("btn-back").addEventListener("click", () => showView("view-list"));
+  $("btn-close-detail").addEventListener("click", () => closeRecipeDetail());
 
   document.querySelectorAll("[data-close-modal]").forEach(btn => {
     btn.addEventListener("click", (e) => e.target.closest(".modal-overlay").classList.add("hidden"));
@@ -955,18 +1060,8 @@ function wireEvents() {
     applyRecipeFilter();
   });
 
-  $("btn-select-mode").addEventListener("click", () => {
-    selectionMode = !selectionMode;
-    selectedIndices.clear();
-    $("btn-select-mode").textContent = selectionMode ? "✕ Annuler la sélection" : "☑️ Sélectionner";
-    applyRecipeFilter();
-    updateSelectionBar();
-  });
-
   $("btn-cancel-selection").addEventListener("click", () => {
-    selectionMode = false;
     selectedIndices.clear();
-    $("btn-select-mode").textContent = "☑️ Sélectionner";
     applyRecipeFilter();
     updateSelectionBar();
   });
@@ -976,9 +1071,7 @@ function wireEvents() {
     const selectedRecipes = [...selectedIndices].map(i => currentRecipes[i]);
     const items = buildShoppingList(selectedRecipes);
     currentShoppingList = { items, updatedAt: new Date().toISOString() };
-    selectionMode = false;
     selectedIndices.clear();
-    $("btn-select-mode").textContent = "☑️ Sélectionner";
     updateSelectionBar();
     applyRecipeFilter();
     showView("view-shopping");
@@ -1019,11 +1112,25 @@ function wireEvents() {
     }
   });
 
+  $("btn-export-ics").addEventListener("click", exportShoppingListToIcs);
+
   $("shopping-list-items").addEventListener("change", (e) => {
     if (e.target.type !== "checkbox") return;
     const idx = Number(e.target.dataset.index);
     if (!currentShoppingList || !currentShoppingList.items[idx]) return;
     currentShoppingList.items[idx].checked = e.target.checked;
+    renderShoppingList(currentShoppingList);
+    clearTimeout(shoppingSaveTimer);
+    shoppingSaveTimer = setTimeout(() => {
+      ghSaveShoppingList(currentShoppingList).catch(() => {});
+    }, 600);
+  });
+
+  $("shopping-list-items").addEventListener("click", (e) => {
+    const btn = e.target.closest(".shopping-item-remove");
+    if (!btn || !currentShoppingList) return;
+    const idx = Number(btn.dataset.index);
+    currentShoppingList.items.splice(idx, 1);
     renderShoppingList(currentShoppingList);
     clearTimeout(shoppingSaveTimer);
     shoppingSaveTimer = setTimeout(() => {

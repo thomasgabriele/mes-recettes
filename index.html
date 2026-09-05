@@ -17,6 +17,9 @@
     <span class="brand-mark">🍲</span>
     <h1>Mes Recettes</h1>
   </div>
+  <div class="topbar-search">
+    <input type="text" id="search-input" placeholder="Rechercher un titre, un ingrédient...">
+  </div>
   <div class="topbar-actions">
     <button id="btn-add" class="btn btn-primary">＋ Importer</button>
     <button id="btn-shopping" class="btn btn-icon" title="Liste de courses" aria-label="Liste de courses">🛒</button>
@@ -35,32 +38,38 @@
   </div>
 
   <div id="list-toolbar" class="list-toolbar hidden">
-    <div class="search-bar">
-      <input type="text" id="search-input" placeholder="Rechercher un titre, un ingrédient...">
-      <select id="filter-preptime">
-        <option value="">Toute durée</option>
-        <option value="15">≤ 15 min</option>
-        <option value="30">≤ 30 min</option>
-        <option value="60">≤ 60 min</option>
-      </select>
-    </div>
-    <button id="btn-select-mode" class="btn btn-text">☑️ Sélectionner</button>
+    <select id="filter-preptime">
+      <option value="">Toute durée</option>
+      <option value="15">≤ 15 min</option>
+      <option value="30">≤ 30 min</option>
+      <option value="60">≤ 60 min</option>
+    </select>
   </div>
   <div id="category-filters" class="category-filters hidden"></div>
   <div id="difficulty-filters" class="category-filters hidden"></div>
-  <div id="recipe-grid" class="recipe-grid hidden"></div>
-</main>
 
-<section id="view-detail" class="view detail-view hidden">
-  <button id="btn-back" class="btn btn-text">← Retour</button>
-  <article id="detail-content"></article>
-</section>
+  <div id="app-layout" class="app-layout hidden">
+    <div class="list-pane">
+      <div id="recipe-grid" class="recipe-list"></div>
+    </div>
+    <div class="detail-pane" id="detail-pane">
+      <div id="detail-placeholder" class="detail-placeholder">
+        <p>Sélectionne une recette pour l'afficher ici.</p>
+      </div>
+      <button id="btn-close-detail" class="btn btn-icon detail-close">✕</button>
+      <article id="detail-content" class="hidden"></article>
+    </div>
+  </div>
+</main>
 
 <section id="view-shopping" class="view detail-view hidden">
   <button id="btn-back-shopping" class="btn btn-text">← Retour</button>
   <div class="shopping-header">
     <h2>Liste de courses</h2>
-    <button id="btn-clear-shopping" class="btn btn-text">🗑 Vider la liste</button>
+    <div class="shopping-header-actions">
+      <button id="btn-export-ics" class="btn btn-text">📤 Exporter vers Rappels</button>
+      <button id="btn-clear-shopping" class="btn btn-text">🗑 Vider la liste</button>
+    </div>
   </div>
   <div id="shopping-list-items"></div>
 </section>
