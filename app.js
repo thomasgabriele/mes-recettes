@@ -277,6 +277,20 @@ async function fetchPageText(url) {
       lastErr = e;
     }
   }
+  // Repli : service de lecture qui contourne mieux les protections anti-robot
+  // de certains sites (renvoie du texte propre, mais pas la photo).
+  try {
+    const res = await fetchWithTimeout(`https://r.jina.ai/${url}`, 20000);
+    if (res.ok) {
+      const text = await res.text();
+      const cleaned = text.replace(/\n{2,}/g, "\n").trim();
+      if (cleaned.length > 200) return { text: cleaned, imageUrl: "" };
+    } else {
+      lastErr = new Error(`r.jina.ai : ${res.status}`);
+    }
+  } catch (e) {
+    lastErr = e;
+  }
   throw new Error(`Impossible de lire cette page (${lastErr?.message || "erreur inconnue"})`);
 }
 
