@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mes Recettes</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍲</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">🍲</span>
+    <h1>Mes Recettes</h1>
+  </div>
+  <div class="topbar-actions">
+    <button id="btn-add" class="btn btn-primary">＋ Importer</button>
+    <button id="btn-settings" class="btn btn-icon" title="Réglages" aria-label="Réglages">⚙️</button>
+  </div>
+</header>
+
+<main id="view-list" class="view">
+  <div id="empty-state" class="empty-state hidden">
+    <p class="empty-title">Aucune recette pour l'instant</p>
+    <p class="empty-sub">Importe ta première recette depuis une photo ou un site web.</p>
+    <button class="btn btn-primary" id="btn-add-empty">＋ Importer une recette</button>
+  </div>
+  <div id="loading-state" class="loading-state">
+    <p>Chargement des recettes…</p>
+  </div>
+  <div id="recipe-grid" class="recipe-grid hidden"></div>
+</main>
+
+<section id="view-detail" class="view detail-view hidden">
+  <button id="btn-back" class="btn btn-text">← Retour</button>
+  <article id="detail-content"></article>
+</section>
+
+<!-- Modale : réglages -->
+<div id="modal-settings" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Réglages</h2>
+      <button class="btn btn-icon" data-close-modal>✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-intro">Ces informations restent uniquement dans ton navigateur — elles ne sont jamais envoyées ailleurs qu'à Anthropic (pour lire tes recettes) et à GitHub (pour les sauvegarder).</p>
+
+      <label class="field">
+        <span>Clé API Anthropic</span>
+        <input type="password" id="input-anthropic-key" placeholder="sk-ant-...">
+        <small><a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Créer une clé →</a></small>
+      </label>
+
+      <label class="field">
+        <span>Nom d'utilisateur GitHub</span>
+        <input type="text" id="input-gh-owner" placeholder="ex : marie-dupont">
+      </label>
+
+      <label class="field">
+        <span>Nom du dépôt GitHub</span>
+        <input type="text" id="input-gh-repo" placeholder="ex : mes-recettes">
+      </label>
+
+      <label class="field">
+        <span>Jeton d'accès GitHub (Personal Access Token)</span>
+        <input type="password" id="input-gh-token" placeholder="github_pat_...">
+        <small><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Créer un jeton →</a> (donne-lui uniquement l'accès "Contents: Read and write" sur ce dépôt)</small>
+      </label>
+
+      <button id="btn-save-settings" class="btn btn-primary btn-block">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modale : import -->
+<div id="modal-import" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Importer une recette</h2>
+      <button class="btn btn-icon" data-close-modal>✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div id="import-choice" class="import-choice">
+        <button class="import-option" id="opt-photo">
+          <span class="import-icon">📷</span>
+          <span>Depuis une photo</span>
+        </button>
+        <button class="import-option" id="opt-url">
+          <span class="import-icon">🔗</span>
+          <span>Depuis un site web</span>
+        </button>
+      </div>
+
+      <div id="import-photo-form" class="import-form hidden">
+        <label class="field">
+          <span>Photo de la recette</span>
+          <input type="file" id="input-photo" accept="image/*" capture="environment">
+        </label>
+        <button id="btn-extract-photo" class="btn btn-primary btn-block">Analyser la photo</button>
+      </div>
+
+      <div id="import-url-form" class="import-form hidden">
+        <label class="field">
+          <span>Adresse du site web</span>
+          <input type="url" id="input-url" placeholder="https://...">
+        </label>
+        <button id="btn-extract-url" class="btn btn-primary btn-block">Analyser la page</button>
+      </div>
+
+      <div id="import-loading" class="import-loading hidden">
+        <div class="spinner"></div>
+        <p id="import-loading-text">Analyse en cours…</p>
+      </div>
+
+      <div id="import-review" class="import-review hidden">
+        <p class="modal-intro">Vérifie et corrige si besoin, puis enregistre.</p>
+        <label class="field">
+          <span>Titre</span>
+          <input type="text" id="review-title">
+        </label>
+        <div class="field-row">
+          <label class="field">
+            <span>Portions</span>
+            <input type="text" id="review-servings">
+          </label>
+          <label class="field">
+            <span>Préparation</span>
+            <input type="text" id="review-prep">
+          </label>
+          <label class="field">
+            <span>Cuisson</span>
+            <input type="text" id="review-cook">
+          </label>
+        </div>
+        <label class="field">
+          <span>Ingrédients (un par ligne)</span>
+          <textarea id="review-ingredients" rows="6"></textarea>
+        </label>
+        <label class="field">
+          <span>Étapes (une par ligne)</span>
+          <textarea id="review-steps" rows="8"></textarea>
+        </label>
+        <button id="btn-save-recipe" class="btn btn-primary btn-block">Enregistrer la recette</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
