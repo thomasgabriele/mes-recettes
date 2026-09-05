@@ -1,0 +1,122 @@
+{
+  "items": [
+    {
+      "quantity": 1,
+      "unit": "cuillère",
+      "name": "à soupe de miel ou sucrant au choix (si version vegan : sirop d'érable ou sirop d'agave)",
+      "recipes": [
+        "Brioche nuage aux blancs d'œufs et pépites de chocolat"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 40,
+      "unit": "gr",
+      "name": "beurre",
+      "recipes": [
+        "Le meilleur riz au lait de Paris"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 250,
+      "unit": "gr",
+      "name": "crème liquide",
+      "recipes": [
+        "Le meilleur riz au lait de Paris"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 1,
+      "unit": "petite",
+      "name": "cuillère à café rase de levure chimique (environ 4 g)",
+      "recipes": [
+        "Brioche nuage aux blancs d'œufs et pépites de chocolat"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 1,
+      "unit": "grosse",
+      "name": "cuillère à soupe de Maïzena (environ 12 g)",
+      "recipes": [
+        "Brioche nuage aux blancs d'œufs et pépites de chocolat"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 300,
+      "unit": "gr",
+      "name": "lait",
+      "recipes": [
+        "Le meilleur riz au lait de Paris"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 5,
+      "unit": "blancs",
+      "name": "œufs (à température ambiante)",
+      "recipes": [
+        "Brioche nuage aux blancs d'œufs et pépites de chocolat"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 60,
+      "unit": "g",
+      "name": "pépites de chocolat (noir de préférence)",
+      "recipes": [
+        "Brioche nuage aux blancs d'œufs et pépites de chocolat"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": null,
+      "unit": "",
+      "name": "Quelques gouttes de vanille liquide",
+      "recipes": [
+        "Brioche nuage aux blancs d'œufs et pépites de chocolat"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 200,
+      "unit": "gr",
+      "name": "riz",
+      "recipes": [
+        "Le meilleur riz au lait de Paris"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": null,
+      "unit": "",
+      "name": "Riz soufflé (2 grosses poignées)",
+      "recipes": [
+        "Le meilleur riz au lait de Paris"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 180,
+      "unit": "gr",
+      "name": "sucre",
+      "recipes": [
+        "Le meilleur riz au lait de Paris"
+      ],
+      "checked": false
+    },
+    {
+      "quantity": 2,
+      "unit": "gousses",
+      "name": "vanille",
+      "recipes": [
+        "Le meilleur riz au lait de Paris"
+      ],
+      "checked": false
+    }
+  ],
+  "updatedAt": "2026-09-05T17:46:55.264Z"
+}
