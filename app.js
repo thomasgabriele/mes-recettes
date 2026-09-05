@@ -10,8 +10,10 @@ const RECIPES_PATH = "recipes";
 
 let settings = loadSettings();
 let currentRecipes = []; // cache { path, sha, data }
-let pendingReview = null; // { source, data }
+let pendingReview = null; // { source, data, editing? }
 let reviewPhoto = ""; // URL ou data URL de la photo en cours d'édition
+let reviewSteps = []; // [{ text, tip }] en cours d'édition
+let currentCategoryFilter = ""; // catégorie sélectionnée dans la liste ("" = toutes)
 
 /* ---------- Réglages ---------- */
 
@@ -282,20 +284,64 @@ async function refreshRecipeList() {
 
 function renderRecipeGrid(recipes) {
   $("loading-state").classList.add("hidden");
-  if (recipes.length === 0) {
-    $("empty-state").classList.remove("hidden");
+  renderCategoryFilters(recipes);
+  applyRecipeFilter();
+}
+
+function getCategories(recipes) {
+  return [...new Set(recipes.map(r => (r.data.category || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "fr"));
+}
+
+function renderCategoryFilters(recipes) {
+  const bar = $("category-filters");
+  const dl = $("category-list");
+  const cats = getCategories(recipes);
+  dl.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}"></option>`).join("");
+  if (cats.length === 0) {
+    bar.classList.add("hidden");
+    bar.innerHTML = "";
     return;
   }
+  bar.classList.remove("hidden");
+  bar.innerHTML = "";
+  const makeChip = (label, value) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "category-chip" + (currentCategoryFilter === value ? " active" : "");
+    chip.textContent = label;
+    chip.addEventListener("click", () => { currentCategoryFilter = value; applyRecipeFilter(); renderCategoryFilters(currentRecipes); });
+    return chip;
+  };
+  bar.appendChild(makeChip("Toutes", ""));
+  cats.forEach(c => bar.appendChild(makeChip(c, c)));
+}
+
+function applyRecipeFilter() {
+  const recipes = currentRecipes;
+  const filtered = currentCategoryFilter
+    ? recipes.filter(r => (r.data.category || "").trim() === currentCategoryFilter)
+    : recipes;
+
+  if (recipes.length === 0) {
+    $("empty-state").classList.remove("hidden");
+    $("recipe-grid").classList.add("hidden");
+    return;
+  }
+  $("empty-state").classList.add("hidden");
+
   const grid = $("recipe-grid");
   grid.innerHTML = "";
-  recipes.forEach((r, i) => {
+  filtered.forEach((r) => {
+    const index = currentRecipes.indexOf(r);
     const card = document.createElement("div");
     card.className = "recipe-card";
     const meta = [r.data.prepTime, r.data.cookTime, r.data.servings].filter(Boolean);
     const photoHtml = r.data.photo ? `<img class="recipe-card-photo" src="${escapeHtml(r.data.photo)}" alt="">` : "";
-    card.innerHTML = `${photoHtml}<h3>${escapeHtml(r.data.title || "Sans titre")}</h3>
+    const categoryHtml = r.data.category ? `<span class="recipe-card-category">${escapeHtml(r.data.category)}</span>` : "";
+    card.innerHTML = `${photoHtml}${categoryHtml}<h3>${escapeHtml(r.data.title || "Sans titre")}</h3>
       <div class="recipe-meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join("")}</div>`;
-    card.addEventListener("click", () => openRecipeDetail(i));
+    card.addEventListener("click", () => openRecipeDetail(index));
     grid.appendChild(card);
   });
   grid.classList.remove("hidden");
@@ -306,6 +352,9 @@ function escapeHtml(s) {
 }
 
 /* ---------- Détail d'une recette ---------- */
+
+function stepText(s) { return typeof s === "string" ? s : (s.text || ""); }
+function stepTip(s) { return typeof s === "string" ? "" : (s.tip || ""); }
 
 function openRecipeDetail(index) {
   const r = currentRecipes[index];
@@ -319,6 +368,7 @@ function openRecipeDetail(index) {
   $("detail-content").innerHTML = `
     ${d.photo ? `<img class="detail-photo" src="${escapeHtml(d.photo)}" alt="">` : ""}
     <div class="detail-header">
+      ${d.category ? `<span class="recipe-card-category">${escapeHtml(d.category)}</span>` : ""}
       <h2>${escapeHtml(d.title || "Sans titre")}</h2>
       <div class="detail-meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join("")}</div>
       ${d.source && d.source.url ? `<div class="detail-source">Source : <a href="${escapeHtml(d.source.url)}" target="_blank" rel="noopener">${escapeHtml(d.source.url)}</a></div>` : ""}
@@ -329,13 +379,15 @@ function openRecipeDetail(index) {
     </div>
     <div class="detail-section">
       <h4>ÉTAPES</h4>
-      <ol class="step-list">${(d.steps || []).map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
+      <ol class="step-list">${(d.steps || []).map(s => `<li>${escapeHtml(stepText(s))}${stepTip(s) ? `<div class="step-tip">💡 ${escapeHtml(stepTip(s))}</div>` : ""}</li>`).join("")}</ol>
     </div>
     <div class="detail-footer">
+      <button class="btn btn-text" id="btn-edit-recipe">✏️ Modifier</button>
       <button class="btn btn-danger" id="btn-delete-recipe">Supprimer cette recette</button>
     </div>
   `;
   $("btn-delete-recipe").addEventListener("click", () => deleteCurrentRecipe(r));
+  $("btn-edit-recipe").addEventListener("click", () => startEditRecipe(r));
   showView("view-detail");
 }
 
@@ -354,6 +406,7 @@ async function deleteCurrentRecipe(r) {
 /* ---------- Import : flux commun ---------- */
 
 function resetImportModal() {
+  $("import-modal-title").textContent = "Importer une recette";
   $("import-choice").classList.remove("hidden");
   $("import-photo-form").classList.add("hidden");
   $("import-url-form").classList.add("hidden");
@@ -364,6 +417,7 @@ function resetImportModal() {
   $("review-photo-file").value = "";
   pendingReview = null;
   reviewPhoto = "";
+  reviewSteps = [];
 }
 
 function setReviewPhoto(value) {
@@ -380,44 +434,82 @@ function setReviewPhoto(value) {
   }
 }
 
+function renderStepsEditor() {
+  const container = $("review-steps-list");
+  container.innerHTML = reviewSteps.map((step, i) => `
+    <div class="step-edit-row">
+      <div class="step-edit-header">
+        <span class="step-edit-number">${i + 1}</span>
+        <button type="button" class="btn btn-icon step-remove" data-index="${i}">✕</button>
+      </div>
+      <textarea class="step-edit-text" rows="2" data-index="${i}" placeholder="Décris l'étape...">${escapeHtml(step.text)}</textarea>
+      <input type="text" class="step-edit-tip" data-index="${i}" placeholder="💡 Astuce (optionnel)" value="${escapeHtml(step.tip || "")}">
+    </div>
+  `).join("");
+}
+
 function showReview(data, source) {
   pendingReview = { source, data };
   $("review-title").value = data.title || "";
+  $("review-category").value = data.category || "";
   $("review-servings").value = data.servings || "";
   $("review-prep").value = data.prepTime || "";
   $("review-cook").value = data.cookTime || "";
   $("review-ingredients").value = (data.ingredients || []).join("\n");
-  $("review-steps").value = (data.steps || []).join("\n");
+  reviewSteps = (data.steps || []).map(s => ({ text: stepText(s), tip: stepTip(s) }));
+  renderStepsEditor();
   setReviewPhoto(data.photo || "");
+  $("btn-save-recipe").textContent = "Enregistrer la recette";
+  $("import-modal-title").textContent = "Importer une recette";
   $("import-loading").classList.add("hidden");
   $("import-review").classList.remove("hidden");
+}
+
+function startEditRecipe(r) {
+  resetImportModal();
+  showReview({ ...r.data }, r.data.source || {});
+  pendingReview.editing = { path: r.path, sha: r.sha, createdAt: r.data.createdAt };
+  $("import-choice").classList.add("hidden");
+  $("btn-save-recipe").textContent = "Enregistrer les modifications";
+  $("import-modal-title").textContent = "Modifier la recette";
+  openModal("modal-import");
 }
 
 async function saveReviewedRecipe() {
   const now = new Date();
   const title = $("review-title").value.trim() || "Sans titre";
-  const slug = title.toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || "recette";
-  const path = `${RECIPES_PATH}/${slug}-${now.getTime()}.json`;
+  const editing = pendingReview.editing;
+  let path;
+  if (editing) {
+    path = editing.path;
+  } else {
+    const slug = title.toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || "recette";
+    path = `${RECIPES_PATH}/${slug}-${now.getTime()}.json`;
+  }
 
   const recipe = {
     title,
+    category: $("review-category").value.trim(),
     servings: $("review-servings").value.trim(),
     prepTime: $("review-prep").value.trim(),
     cookTime: $("review-cook").value.trim(),
     ingredients: $("review-ingredients").value.split("\n").map(s => s.trim()).filter(Boolean),
-    steps: $("review-steps").value.split("\n").map(s => s.trim()).filter(Boolean),
+    steps: reviewSteps
+      .map(s => ({ text: s.text.trim(), tip: (s.tip || "").trim() }))
+      .filter(s => s.text),
     photo: reviewPhoto,
     source: pendingReview.source,
-    createdAt: now.toISOString()
+    createdAt: editing ? editing.createdAt : now.toISOString()
   };
+  if (editing) recipe.updatedAt = now.toISOString();
 
   try {
     $("btn-save-recipe").disabled = true;
-    $("btn-save-recipe").textContent = "Enregistrement…";
-    await ghSaveFile(path, recipe, null);
-    showToast("Recette enregistrée");
+    $("btn-save-recipe").textContent = editing ? "Enregistrement…" : "Enregistrement…";
+    await ghSaveFile(path, recipe, editing ? editing.sha : null);
+    showToast(editing ? "Recette mise à jour" : "Recette enregistrée");
     closeModal("modal-import");
     resetImportModal();
     showView("view-list");
@@ -426,7 +518,7 @@ async function saveReviewedRecipe() {
     showToast("Erreur : " + e.message, true);
   } finally {
     $("btn-save-recipe").disabled = false;
-    $("btn-save-recipe").textContent = "Enregistrer la recette";
+    $("btn-save-recipe").textContent = editing ? "Enregistrer les modifications" : "Enregistrer la recette";
   }
 }
 
@@ -476,7 +568,7 @@ function wireEvents() {
 
   $("opt-manual").addEventListener("click", () => {
     $("import-choice").classList.add("hidden");
-    showReview({}, { type: "manual" });
+    showReview({ steps: [{ text: "", tip: "" }] }, { type: "manual" });
   });
 
   $("btn-extract-photo").addEventListener("click", async () => {
@@ -547,6 +639,27 @@ function wireEvents() {
       btn.disabled = false;
       btn.textContent = original;
     }
+  });
+
+  $("btn-add-step").addEventListener("click", () => {
+    reviewSteps.push({ text: "", tip: "" });
+    renderStepsEditor();
+    const rows = $("review-steps-list").querySelectorAll(".step-edit-text");
+    rows[rows.length - 1]?.focus();
+  });
+
+  $("review-steps-list").addEventListener("input", (e) => {
+    const idx = Number(e.target.dataset.index);
+    if (Number.isNaN(idx) || !reviewSteps[idx]) return;
+    if (e.target.classList.contains("step-edit-text")) reviewSteps[idx].text = e.target.value;
+    else if (e.target.classList.contains("step-edit-tip")) reviewSteps[idx].tip = e.target.value;
+  });
+
+  $("review-steps-list").addEventListener("click", (e) => {
+    const btn = e.target.closest(".step-remove");
+    if (!btn) return;
+    reviewSteps.splice(Number(btn.dataset.index), 1);
+    renderStepsEditor();
   });
 
   $("btn-save-recipe").addEventListener("click", saveReviewedRecipe);

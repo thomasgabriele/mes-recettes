@@ -32,6 +32,7 @@
   <div id="loading-state" class="loading-state">
     <p>Chargement des recettes…</p>
   </div>
+  <div id="category-filters" class="category-filters hidden"></div>
   <div id="recipe-grid" class="recipe-grid hidden"></div>
 </main>
 
@@ -81,7 +82,7 @@
 <div id="modal-import" class="modal-overlay hidden">
   <div class="modal">
     <div class="modal-header">
-      <h2>Importer une recette</h2>
+      <h2 id="import-modal-title">Importer une recette</h2>
       <button class="btn btn-icon" data-close-modal>✕</button>
     </div>
     <div class="modal-body">
@@ -139,6 +140,11 @@
           <span>Titre</span>
           <input type="text" id="review-title">
         </label>
+        <label class="field">
+          <span>Catégorie</span>
+          <input type="text" id="review-category" list="category-list" placeholder="ex : Dessert, Plat, Entrée...">
+          <datalist id="category-list"></datalist>
+        </label>
         <div class="field-row">
           <label class="field">
             <span>Portions</span>
@@ -157,10 +163,11 @@
           <span>Ingrédients (un par ligne)</span>
           <textarea id="review-ingredients" rows="6"></textarea>
         </label>
-        <label class="field">
-          <span>Étapes (une par ligne)</span>
-          <textarea id="review-steps" rows="8"></textarea>
-        </label>
+        <div class="field">
+          <span>Étapes</span>
+          <div id="review-steps-list"></div>
+          <button type="button" id="btn-add-step" class="btn btn-text">＋ Ajouter une étape</button>
+        </div>
         <button id="btn-save-recipe" class="btn btn-primary btn-block">Enregistrer la recette</button>
       </div>
 
