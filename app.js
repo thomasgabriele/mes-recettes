@@ -192,10 +192,14 @@ async function findImageViaWebSearch(title) {
   if (!title) return "";
   try {
     const text = await callClaudeRaw([
-      { type: "text", text: `Cherche sur le web une vraie photo du plat "${title}". Réponds UNIQUEMENT avec l'URL directe de l'image (se terminant par .jpg, .jpeg, .png ou .webp), sans aucun autre texte, sans balises markdown. Si tu ne trouves rien de fiable, réponds exactement AUCUNE.` }
+      { type: "text", text: `Cherche sur le web une vraie photo du plat "${title}".
+Privilégie les photos culinaires issues de blogs de cuisine ou de Wikimedia Commons. Évite les banques d'images payantes (iStock, Getty Images, Alamy, Shutterstock, Depositphotos) : elles bloquent l'affichage direct et leurs liens ne fonctionneront pas.
+Si tu trouves un fichier sur Wikipédia ou Wikimedia Commons, donne l'URL sous la forme exacte https://commons.wikimedia.org/wiki/Special:FilePath/NOM_DE_FICHIER.EXT (le lien direct vers l'image, pas la page de description du fichier).
+Réponds UNIQUEMENT avec l'URL directe de l'image (se terminant par .jpg, .jpeg, .png ou .webp), sans aucun autre texte, sans balises markdown. Si tu ne trouves vraiment rien d'utilisable, réponds exactement AUCUNE.` }
     ], { tools: [{ type: "web_search_20250305", name: "web_search" }], maxTokens: 1024 });
     const cleaned = text.trim().replace(/^["'\`]+|["'\`]+$/g, "");
-    if (/^https?:\/\/\S+\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(cleaned)) return cleaned;
+    const match = cleaned.match(/https?:\/\/\S+?\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?/i);
+    if (match) return match[0].replace(/[)\].,;:!?'"]+$/, "");
     return "";
   } catch {
     return "";
