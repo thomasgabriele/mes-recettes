@@ -19,6 +19,7 @@
   </div>
   <div class="topbar-actions">
     <button id="btn-add" class="btn btn-primary">＋ Importer</button>
+    <button id="btn-shopping" class="btn btn-icon" title="Liste de courses" aria-label="Liste de courses">🛒</button>
     <button id="btn-settings" class="btn btn-icon" title="Réglages" aria-label="Réglages">⚙️</button>
   </div>
 </header>
@@ -32,7 +33,21 @@
   <div id="loading-state" class="loading-state">
     <p>Chargement des recettes…</p>
   </div>
+
+  <div id="list-toolbar" class="list-toolbar hidden">
+    <div class="search-bar">
+      <input type="text" id="search-input" placeholder="Rechercher un titre, un ingrédient...">
+      <select id="filter-preptime">
+        <option value="">Toute durée</option>
+        <option value="15">≤ 15 min</option>
+        <option value="30">≤ 30 min</option>
+        <option value="60">≤ 60 min</option>
+      </select>
+    </div>
+    <button id="btn-select-mode" class="btn btn-text">☑️ Sélectionner</button>
+  </div>
   <div id="category-filters" class="category-filters hidden"></div>
+  <div id="difficulty-filters" class="category-filters hidden"></div>
   <div id="recipe-grid" class="recipe-grid hidden"></div>
 </main>
 
@@ -40,6 +55,23 @@
   <button id="btn-back" class="btn btn-text">← Retour</button>
   <article id="detail-content"></article>
 </section>
+
+<section id="view-shopping" class="view detail-view hidden">
+  <button id="btn-back-shopping" class="btn btn-text">← Retour</button>
+  <div class="shopping-header">
+    <h2>Liste de courses</h2>
+    <button id="btn-clear-shopping" class="btn btn-text">🗑 Vider la liste</button>
+  </div>
+  <div id="shopping-list-items"></div>
+</section>
+
+<div id="selection-bar" class="selection-bar hidden">
+  <span id="selection-count">0 sélectionnée(s)</span>
+  <div class="selection-actions">
+    <button id="btn-cancel-selection" class="btn btn-text">Annuler</button>
+    <button id="btn-create-shopping-list" class="btn btn-primary">🛒 Créer la liste</button>
+  </div>
+</div>
 
 <!-- Modale : réglages -->
 <div id="modal-settings" class="modal-overlay hidden">
@@ -147,8 +179,8 @@
         </label>
         <div class="field-row">
           <label class="field">
-            <span>Portions</span>
-            <input type="text" id="review-servings">
+            <span>Personnes</span>
+            <input type="number" id="review-base-servings" min="1" placeholder="4">
           </label>
           <label class="field">
             <span>Préparation</span>
@@ -160,9 +192,19 @@
           </label>
         </div>
         <label class="field">
-          <span>Ingrédients (un par ligne)</span>
-          <textarea id="review-ingredients" rows="6"></textarea>
+          <span>Difficulté</span>
+          <select id="review-difficulty">
+            <option value="">Non précisée</option>
+            <option value="Facile">Facile</option>
+            <option value="Moyen">Moyen</option>
+            <option value="Difficile">Difficile</option>
+          </select>
         </label>
+        <div class="field">
+          <span>Ingrédients</span>
+          <div id="review-ingredients-list"></div>
+          <button type="button" id="btn-add-ingredient" class="btn btn-text">＋ Ajouter un ingrédient</button>
+        </div>
         <div class="field">
           <span>Étapes</span>
           <div id="review-steps-list"></div>

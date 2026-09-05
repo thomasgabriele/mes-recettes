@@ -13,7 +13,19 @@ let currentRecipes = []; // cache { path, sha, data }
 let pendingReview = null; // { source, data, editing? }
 let reviewPhoto = ""; // URL ou data URL de la photo en cours d'édition
 let reviewSteps = []; // [{ text, tip }] en cours d'édition
+let reviewIngredients = []; // [{ quantity, unit, name }] en cours d'édition
 let currentCategoryFilter = ""; // catégorie sélectionnée dans la liste ("" = toutes)
+let currentDifficultyFilter = ""; // difficulté sélectionnée ("" = toutes)
+let currentSearchQuery = "";
+let currentPrepTimeMax = ""; // minutes, "" = toute durée
+let selectionMode = false;
+let selectedIndices = new Set();
+let detailServings = null; // portions actuellement affichées dans le détail
+let currentShoppingList = null; // { items: [...] }
+let currentShoppingListSha = null;
+let shoppingSaveTimer = null;
+
+const DIFFICULTY_ORDER = ["Facile", "Moyen", "Difficile"];
 
 /* ---------- Réglages ---------- */
 
@@ -89,8 +101,9 @@ function utf8ToBase64(str) {
 }
 
 async function ghSaveFile(path, jsonData, existingSha) {
+  const label = path.startsWith(RECIPES_PATH + "/") ? "recette" : "fichier";
   const body = {
-    message: existingSha ? `Mise à jour recette : ${path}` : `Ajout recette : ${path}`,
+    message: existingSha ? `Mise à jour ${label} : ${path}` : `Ajout ${label} : ${path}`,
     content: utf8ToBase64(JSON.stringify(jsonData, null, 2)),
   };
   if (existingSha) body.sha = existingSha;
@@ -110,6 +123,30 @@ async function ghDeleteFile(path, sha) {
     body: JSON.stringify({ message: `Suppression recette : ${path}`, sha })
   });
   if (!res.ok) throw new Error(`GitHub (suppression) : ${res.status} ${await res.text()}`);
+}
+
+async function ghGetFileRaw(path) {
+  const res = await fetch(ghContentsUrl(path), { headers: ghHeaders() });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GitHub (lecture) : ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+async function ghLoadShoppingList() {
+  const existing = await ghGetFileRaw("shopping-list.json");
+  if (!existing) return null;
+  const content = decodeURIComponent(escape(atob(existing.content.replace(/\n/g, ""))));
+  return { data: JSON.parse(content), sha: existing.sha };
+}
+
+async function ghSaveShoppingList(list) {
+  let sha = currentShoppingListSha;
+  try {
+    const existing = await ghGetFileRaw("shopping-list.json");
+    sha = existing ? existing.sha : null;
+  } catch { /* on tente quand même l'écriture */ }
+  const result = await ghSaveFile("shopping-list.json", list, sha);
+  currentShoppingListSha = result?.content?.sha || null;
 }
 
 /* ---------- Appels à Claude ---------- */
@@ -169,12 +206,14 @@ const EXTRACTION_INSTRUCTIONS = `Tu extrais une recette de cuisine et tu répond
 {
   "title": "string",
   "servings": "string (ex: '4 personnes', vide si inconnu)",
+  "baseServings": nombre entier correspondant (ex: 4), ou null si vraiment impossible à déterminer,
   "prepTime": "string (ex: '15 min', vide si inconnu)",
   "cookTime": "string (ex: '30 min', vide si inconnu)",
-  "ingredients": ["string", "..."],
+  "difficulty": "Facile" ou "Moyen" ou "Difficile" ou "" si vraiment impossible à estimer,
+  "ingredients": [{"quantity": nombre ou null, "unit": "string (ex: 'g', 'ml', 'cuillères à soupe', vide si non pertinent)", "name": "string"}],
   "steps": ["string", "..."]
 }
-Chaque ingrédient est une seule ligne de texte (quantité + unité + nom, ex: "200 g de farine"). Chaque étape est une phrase claire et complète. Si une information est absente de la source, laisse une chaîne vide plutôt que d'inventer.`;
+Pour chaque ingrédient, sépare la quantité numérique (quantity), l'unité (unit) et le nom (name). Ex: "200 g de farine" → {"quantity":200,"unit":"g","name":"farine"}. Si la quantité n'est pas un nombre exploitable (ex: "sel, au goût", "quelques feuilles de basilic"), mets quantity à null, unit à "" et name au texte complet de la ligne. Chaque étape est une phrase claire et complète. Si la difficulté n'est pas indiquée sur la source, déduis-la du nombre d'étapes et de la complexité des techniques utilisées (peu d'étapes et gestes simples → Facile ; techniques avancées, précision ou nombreuses étapes → Difficile). Si une information est absente de la source, laisse une chaîne vide (ou null) plutôt que d'inventer.`;
 
 const IMAGE_EXTRA_INSTRUCTION = `
 Ajoute aussi un champ "isDishPhoto": true si la photo montre le plat cuisiné fini (le résultat à manger), ou false si la photo montre autre chose (une recette écrite, un livre, un écran, un emballage, des ingrédients bruts, etc).`;
@@ -287,7 +326,9 @@ async function refreshRecipeList() {
 
 function renderRecipeGrid(recipes) {
   $("loading-state").classList.add("hidden");
+  $("list-toolbar").classList.toggle("hidden", recipes.length === 0);
   renderCategoryFilters(recipes);
+  renderDifficultyFilters(recipes);
   applyRecipeFilter();
 }
 
@@ -296,35 +337,58 @@ function getCategories(recipes) {
     .sort((a, b) => a.localeCompare(b, "fr"));
 }
 
-function renderCategoryFilters(recipes) {
-  const bar = $("category-filters");
-  const dl = $("category-list");
-  const cats = getCategories(recipes);
-  dl.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}"></option>`).join("");
-  if (cats.length === 0) {
-    bar.classList.add("hidden");
-    bar.innerHTML = "";
+function renderChipBar(barEl, values, current, onPick) {
+  if (values.length === 0) {
+    barEl.classList.add("hidden");
+    barEl.innerHTML = "";
     return;
   }
-  bar.classList.remove("hidden");
-  bar.innerHTML = "";
+  barEl.classList.remove("hidden");
+  barEl.innerHTML = "";
   const makeChip = (label, value) => {
     const chip = document.createElement("button");
     chip.type = "button";
-    chip.className = "category-chip" + (currentCategoryFilter === value ? " active" : "");
+    chip.className = "category-chip" + (current === value ? " active" : "");
     chip.textContent = label;
-    chip.addEventListener("click", () => { currentCategoryFilter = value; applyRecipeFilter(); renderCategoryFilters(currentRecipes); });
+    chip.addEventListener("click", () => onPick(value));
     return chip;
   };
-  bar.appendChild(makeChip("Toutes", ""));
-  cats.forEach(c => bar.appendChild(makeChip(c, c)));
+  barEl.appendChild(makeChip("Toutes", ""));
+  values.forEach(v => barEl.appendChild(makeChip(v, v)));
+}
+
+function renderCategoryFilters(recipes) {
+  const cats = getCategories(recipes);
+  $("category-list").innerHTML = cats.map(c => `<option value="${escapeHtml(c)}"></option>`).join("");
+  renderChipBar($("category-filters"), cats, currentCategoryFilter, (v) => {
+    currentCategoryFilter = v;
+    applyRecipeFilter();
+    renderCategoryFilters(currentRecipes);
+  });
+}
+
+function renderDifficultyFilters(recipes) {
+  const present = DIFFICULTY_ORDER.filter(d => recipes.some(r => r.data.difficulty === d));
+  renderChipBar($("difficulty-filters"), present, currentDifficultyFilter, (v) => {
+    currentDifficultyFilter = v;
+    applyRecipeFilter();
+    renderDifficultyFilters(currentRecipes);
+  });
+}
+
+function matchesSearch(r, query) {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  if ((r.data.title || "").toLowerCase().includes(q)) return true;
+  if ((r.data.category || "").toLowerCase().includes(q)) return true;
+  return (r.data.ingredients || []).some(ing => {
+    const o = ingredientObj(ing);
+    return (o.name || "").toLowerCase().includes(q);
+  });
 }
 
 function applyRecipeFilter() {
   const recipes = currentRecipes;
-  const filtered = currentCategoryFilter
-    ? recipes.filter(r => (r.data.category || "").trim() === currentCategoryFilter)
-    : recipes;
 
   if (recipes.length === 0) {
     $("empty-state").classList.remove("hidden");
@@ -332,6 +396,17 @@ function applyRecipeFilter() {
     return;
   }
   $("empty-state").classList.add("hidden");
+
+  const filtered = recipes.filter(r => {
+    if (currentCategoryFilter && (r.data.category || "").trim() !== currentCategoryFilter) return false;
+    if (currentDifficultyFilter && r.data.difficulty !== currentDifficultyFilter) return false;
+    if (currentPrepTimeMax) {
+      const minutes = parsePrepMinutes(r.data.prepTime);
+      if (minutes == null || minutes > Number(currentPrepTimeMax)) return false;
+    }
+    if (!matchesSearch(r, currentSearchQuery)) return false;
+    return true;
+  });
 
   const grid = $("recipe-grid");
   grid.innerHTML = "";
@@ -342,16 +417,77 @@ function applyRecipeFilter() {
     const meta = [r.data.prepTime, r.data.cookTime, r.data.servings].filter(Boolean);
     const photoHtml = r.data.photo ? `<img class="recipe-card-photo" src="${escapeHtml(r.data.photo)}" alt="">` : "";
     const categoryHtml = r.data.category ? `<span class="recipe-card-category">${escapeHtml(r.data.category)}</span>` : "";
-    card.innerHTML = `${photoHtml}${categoryHtml}<h3>${escapeHtml(r.data.title || "Sans titre")}</h3>
+    const difficultyHtml = r.data.difficulty ? `<span class="recipe-card-difficulty">${escapeHtml(r.data.difficulty)}</span>` : "";
+    const selectHtml = selectionMode ? `<div class="card-select-box">${selectedIndices.has(index) ? "☑" : "☐"}</div>` : "";
+    card.innerHTML = `${selectHtml}${photoHtml}${categoryHtml}${difficultyHtml}<h3>${escapeHtml(r.data.title || "Sans titre")}</h3>
       <div class="recipe-meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join("")}</div>`;
-    card.addEventListener("click", () => openRecipeDetail(index));
+    card.addEventListener("click", () => {
+      if (selectionMode) toggleSelection(index);
+      else openRecipeDetail(index);
+    });
     grid.appendChild(card);
   });
   grid.classList.remove("hidden");
 }
 
+function toggleSelection(index) {
+  if (selectedIndices.has(index)) selectedIndices.delete(index);
+  else selectedIndices.add(index);
+  applyRecipeFilter();
+  updateSelectionBar();
+}
+
+function updateSelectionBar() {
+  const bar = $("selection-bar");
+  if (!selectionMode) { bar.classList.add("hidden"); return; }
+  bar.classList.remove("hidden");
+  $("selection-count").textContent = `${selectedIndices.size} sélectionnée(s)`;
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ---------- Ingrédients : structure quantité / unité / nom ---------- */
+
+function parseIngredientLine(raw) {
+  const m = String(raw).match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-Zàâäéèêëïîôöùûüç]*)\s*(?:de |d')?(.*)$/i);
+  if (m && m[3]) {
+    return { quantity: parseFloat(m[1].replace(",", ".")), unit: (m[2] || "").trim(), name: m[3].trim() };
+  }
+  return { quantity: null, unit: "", name: String(raw).trim() };
+}
+
+function ingredientObj(ing) {
+  if (typeof ing === "string") return parseIngredientLine(ing);
+  return { quantity: ing.quantity ?? null, unit: ing.unit || "", name: ing.name || "" };
+}
+
+function formatQty(q) {
+  const rounded = Math.round(q * 100) / 100;
+  return rounded.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function formatIngredient(ing, ratio = 1) {
+  const o = ingredientObj(ing);
+  if (o.quantity == null) return o.name;
+  const q = formatQty(o.quantity * ratio);
+  return `${q}${o.unit ? " " + o.unit : ""} ${o.name}`.trim();
+}
+
+function parsePrepMinutes(text) {
+  if (!text) return null;
+  const hMatch = String(text).match(/(\d+)\s*h/i);
+  const minMatch = String(text).match(/(\d+)\s*(min|minutes)/i);
+  let total = 0;
+  let found = false;
+  if (hMatch) { total += parseInt(hMatch[1], 10) * 60; found = true; }
+  if (minMatch) { total += parseInt(minMatch[1], 10); found = true; }
+  if (!found) {
+    const num = String(text).match(/(\d+)/);
+    if (num) { total = parseInt(num[1], 10); found = true; }
+  }
+  return found ? total : null;
 }
 
 /* ---------- Détail d'une recette ---------- */
@@ -359,11 +495,25 @@ function escapeHtml(s) {
 function stepText(s) { return typeof s === "string" ? s : (s.text || ""); }
 function stepTip(s) { return typeof s === "string" ? "" : (s.tip || ""); }
 
+function getBaseServings(d) {
+  if (typeof d.baseServings === "number" && d.baseServings > 0) return d.baseServings;
+  const m = String(d.servings || "").match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 function openRecipeDetail(index) {
   const r = currentRecipes[index];
+  const base = getBaseServings(r.data);
+  detailServings = base || null;
+  renderRecipeDetailContent(r);
+  showView("view-detail");
+}
+
+function renderRecipeDetailContent(r) {
   const d = r.data;
+  const base = getBaseServings(d);
+  const ratio = (base && detailServings) ? detailServings / base : 1;
   const meta = [
-    d.servings && `${d.servings}`,
     d.prepTime && `Préparation : ${d.prepTime}`,
     d.cookTime && `Cuisson : ${d.cookTime}`
   ].filter(Boolean);
@@ -372,13 +522,20 @@ function openRecipeDetail(index) {
     ${d.photo ? `<img class="detail-photo" src="${escapeHtml(d.photo)}" alt="">` : ""}
     <div class="detail-header">
       ${d.category ? `<span class="recipe-card-category">${escapeHtml(d.category)}</span>` : ""}
+      ${d.difficulty ? `<span class="recipe-card-difficulty">${escapeHtml(d.difficulty)}</span>` : ""}
       <h2>${escapeHtml(d.title || "Sans titre")}</h2>
       <div class="detail-meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join("")}</div>
       ${d.source && d.source.url ? `<div class="detail-source">Source : <a href="${escapeHtml(d.source.url)}" target="_blank" rel="noopener">${escapeHtml(d.source.url)}</a></div>` : ""}
+      ${base ? `
+        <div class="servings-adjust">
+          <button id="btn-servings-minus" type="button">−</button>
+          <span>${detailServings} personne${detailServings > 1 ? "s" : ""}</span>
+          <button id="btn-servings-plus" type="button">+</button>
+        </div>` : ""}
     </div>
     <div class="detail-section">
       <h4>INGRÉDIENTS</h4>
-      <ul class="ingredient-list">${(d.ingredients || []).map(ing => `<li>${escapeHtml(ing)}</li>`).join("")}</ul>
+      <ul class="ingredient-list">${(d.ingredients || []).map(ing => `<li>${escapeHtml(formatIngredient(ing, ratio))}</li>`).join("")}</ul>
     </div>
     <div class="detail-section">
       <h4>ÉTAPES</h4>
@@ -391,7 +548,16 @@ function openRecipeDetail(index) {
   `;
   $("btn-delete-recipe").addEventListener("click", () => deleteCurrentRecipe(r));
   $("btn-edit-recipe").addEventListener("click", () => startEditRecipe(r));
-  showView("view-detail");
+  if (base) {
+    $("btn-servings-minus").addEventListener("click", () => {
+      detailServings = Math.max(1, detailServings - 1);
+      renderRecipeDetailContent(r);
+    });
+    $("btn-servings-plus").addEventListener("click", () => {
+      detailServings = detailServings + 1;
+      renderRecipeDetailContent(r);
+    });
+  }
 }
 
 async function deleteCurrentRecipe(r) {
@@ -421,6 +587,7 @@ function resetImportModal() {
   pendingReview = null;
   reviewPhoto = "";
   reviewSteps = [];
+  reviewIngredients = [];
 }
 
 function setReviewPhoto(value) {
@@ -451,14 +618,31 @@ function renderStepsEditor() {
   `).join("");
 }
 
+function renderIngredientsEditor() {
+  const container = $("review-ingredients-list");
+  container.innerHTML = reviewIngredients.map((ing, i) => `
+    <div class="ingredient-edit-row">
+      <input type="text" class="ingredient-edit-qty" data-index="${i}" placeholder="Qté" value="${escapeHtml(ing.quantity ?? "")}">
+      <input type="text" class="ingredient-edit-unit" data-index="${i}" placeholder="Unité" value="${escapeHtml(ing.unit || "")}">
+      <input type="text" class="ingredient-edit-name" data-index="${i}" placeholder="Ingrédient" value="${escapeHtml(ing.name || "")}">
+      <button type="button" class="btn btn-icon ingredient-remove" data-index="${i}">✕</button>
+    </div>
+  `).join("");
+}
+
 function showReview(data, source) {
   pendingReview = { source, data };
   $("review-title").value = data.title || "";
   $("review-category").value = data.category || "";
-  $("review-servings").value = data.servings || "";
+  $("review-base-servings").value = getBaseServings(data) || "";
   $("review-prep").value = data.prepTime || "";
   $("review-cook").value = data.cookTime || "";
-  $("review-ingredients").value = (data.ingredients || []).join("\n");
+  $("review-difficulty").value = data.difficulty || "";
+  reviewIngredients = (data.ingredients || []).map(ing => {
+    const o = ingredientObj(ing);
+    return { quantity: o.quantity ?? "", unit: o.unit || "", name: o.name || "" };
+  });
+  renderIngredientsEditor();
   reviewSteps = (data.steps || []).map(s => ({ text: stepText(s), tip: stepTip(s) }));
   renderStepsEditor();
   setReviewPhoto(data.photo || "");
@@ -492,13 +676,22 @@ async function saveReviewedRecipe() {
     path = `${RECIPES_PATH}/${slug}-${now.getTime()}.json`;
   }
 
+  const baseServingsVal = parseInt($("review-base-servings").value, 10);
   const recipe = {
     title,
     category: $("review-category").value.trim(),
-    servings: $("review-servings").value.trim(),
+    baseServings: Number.isFinite(baseServingsVal) && baseServingsVal > 0 ? baseServingsVal : null,
+    servings: Number.isFinite(baseServingsVal) && baseServingsVal > 0 ? `${baseServingsVal} personnes` : "",
     prepTime: $("review-prep").value.trim(),
     cookTime: $("review-cook").value.trim(),
-    ingredients: $("review-ingredients").value.split("\n").map(s => s.trim()).filter(Boolean),
+    difficulty: $("review-difficulty").value,
+    ingredients: reviewIngredients
+      .map(ing => ({
+        quantity: ing.quantity === "" || ing.quantity == null ? null : parseFloat(String(ing.quantity).replace(",", ".")),
+        unit: (ing.unit || "").trim(),
+        name: (ing.name || "").trim()
+      }))
+      .filter(ing => ing.name),
     steps: reviewSteps
       .map(s => ({ text: s.text.trim(), tip: (s.tip || "").trim() }))
       .filter(s => s.text),
@@ -523,6 +716,51 @@ async function saveReviewedRecipe() {
     $("btn-save-recipe").disabled = false;
     $("btn-save-recipe").textContent = editing ? "Enregistrer les modifications" : "Enregistrer la recette";
   }
+}
+
+/* ---------- Liste de courses ---------- */
+
+function buildShoppingList(recipes) {
+  const map = new Map();
+  const unmerged = [];
+  recipes.forEach(r => {
+    (r.data.ingredients || []).forEach(ing => {
+      const o = ingredientObj(ing);
+      if (!o.name) return;
+      if (o.quantity != null) {
+        const key = (o.unit || "").toLowerCase() + "|" + o.name.trim().toLowerCase();
+        if (map.has(key)) {
+          const entry = map.get(key);
+          entry.quantity += o.quantity;
+          entry.recipes.add(r.data.title || "Sans titre");
+        } else {
+          map.set(key, { quantity: o.quantity, unit: o.unit, name: o.name, recipes: new Set([r.data.title || "Sans titre"]), checked: false });
+        }
+      } else {
+        unmerged.push({ quantity: null, unit: "", name: o.name, recipes: new Set([r.data.title || "Sans titre"]), checked: false });
+      }
+    });
+  });
+  const items = [...map.values(), ...unmerged].map(it => ({ ...it, recipes: [...it.recipes] }));
+  items.sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  return items;
+}
+
+function renderShoppingList(list) {
+  const container = $("shopping-list-items");
+  if (!list || !list.items || list.items.length === 0) {
+    container.innerHTML = "<p class='empty-sub'>Ta liste de courses est vide. Sélectionne des recettes depuis la liste pour en créer une.</p>";
+    return;
+  }
+  container.innerHTML = list.items.map((it, i) => `
+    <label class="shopping-item ${it.checked ? "checked" : ""}">
+      <input type="checkbox" data-index="${i}" ${it.checked ? "checked" : ""}>
+      <span>
+        ${escapeHtml((it.quantity != null ? formatQty(it.quantity) + (it.unit ? " " + it.unit : "") + " " : "") + it.name)}
+        <span class="shopping-item-recipes">${escapeHtml(it.recipes.join(", "))}</span>
+      </span>
+    </label>
+  `).join("");
 }
 
 /* ---------- Câblage des événements ---------- */
@@ -571,7 +809,7 @@ function wireEvents() {
 
   $("opt-manual").addEventListener("click", () => {
     $("import-choice").classList.add("hidden");
-    showReview({ steps: [{ text: "", tip: "" }] }, { type: "manual" });
+    showReview({ ingredients: [{ quantity: "", unit: "", name: "" }], steps: [{ text: "", tip: "" }] }, { type: "manual" });
   });
 
   $("btn-extract-photo").addEventListener("click", async () => {
@@ -584,12 +822,9 @@ function wireEvents() {
       const { base64, dataUrl } = await readAndResizeImage(file);
       $("import-loading-text").textContent = "Analyse par l'IA…";
       const data = await extractFromImage(base64, "image/jpeg");
-      if (data.isDishPhoto === false) {
-        $("import-loading-text").textContent = "Recherche d'une photo du plat…";
-        data.photo = (await findImageViaWebSearch(data.title)) || dataUrl;
-      } else {
-        data.photo = dataUrl;
-      }
+      $("import-loading-text").textContent = "Recherche d'une photo du plat…";
+      const webPhoto = await findImageViaWebSearch(data.title);
+      data.photo = webPhoto || (data.isDishPhoto !== false ? dataUrl : "");
       showReview(data, { type: "photo" });
     } catch (e) {
       showToast("Erreur : " + e.message, true);
@@ -668,6 +903,114 @@ function wireEvents() {
     if (!btn) return;
     reviewSteps.splice(Number(btn.dataset.index), 1);
     renderStepsEditor();
+  });
+
+  $("btn-add-ingredient").addEventListener("click", () => {
+    reviewIngredients.push({ quantity: "", unit: "", name: "" });
+    renderIngredientsEditor();
+    const rows = $("review-ingredients-list").querySelectorAll(".ingredient-edit-name");
+    rows[rows.length - 1]?.focus();
+  });
+
+  $("review-ingredients-list").addEventListener("input", (e) => {
+    const idx = Number(e.target.dataset.index);
+    if (Number.isNaN(idx) || !reviewIngredients[idx]) return;
+    if (e.target.classList.contains("ingredient-edit-qty")) reviewIngredients[idx].quantity = e.target.value;
+    else if (e.target.classList.contains("ingredient-edit-unit")) reviewIngredients[idx].unit = e.target.value;
+    else if (e.target.classList.contains("ingredient-edit-name")) reviewIngredients[idx].name = e.target.value;
+  });
+
+  $("review-ingredients-list").addEventListener("click", (e) => {
+    const btn = e.target.closest(".ingredient-remove");
+    if (!btn) return;
+    reviewIngredients.splice(Number(btn.dataset.index), 1);
+    renderIngredientsEditor();
+  });
+
+  $("search-input").addEventListener("input", (e) => {
+    currentSearchQuery = e.target.value;
+    applyRecipeFilter();
+  });
+
+  $("filter-preptime").addEventListener("change", (e) => {
+    currentPrepTimeMax = e.target.value;
+    applyRecipeFilter();
+  });
+
+  $("btn-select-mode").addEventListener("click", () => {
+    selectionMode = !selectionMode;
+    selectedIndices.clear();
+    $("btn-select-mode").textContent = selectionMode ? "✕ Annuler la sélection" : "☑️ Sélectionner";
+    applyRecipeFilter();
+    updateSelectionBar();
+  });
+
+  $("btn-cancel-selection").addEventListener("click", () => {
+    selectionMode = false;
+    selectedIndices.clear();
+    $("btn-select-mode").textContent = "☑️ Sélectionner";
+    applyRecipeFilter();
+    updateSelectionBar();
+  });
+
+  $("btn-create-shopping-list").addEventListener("click", async () => {
+    if (selectedIndices.size === 0) { showToast("Choisis au moins une recette", true); return; }
+    const selectedRecipes = [...selectedIndices].map(i => currentRecipes[i]);
+    const items = buildShoppingList(selectedRecipes);
+    currentShoppingList = { items, updatedAt: new Date().toISOString() };
+    selectionMode = false;
+    selectedIndices.clear();
+    $("btn-select-mode").textContent = "☑️ Sélectionner";
+    updateSelectionBar();
+    applyRecipeFilter();
+    showView("view-shopping");
+    renderShoppingList(currentShoppingList);
+    try {
+      await ghSaveShoppingList(currentShoppingList);
+    } catch (e) {
+      showToast("Erreur d'enregistrement : " + e.message, true);
+    }
+  });
+
+  $("btn-shopping").addEventListener("click", async () => {
+    showView("view-shopping");
+    $("shopping-list-items").innerHTML = "<p class='empty-sub'>Chargement…</p>";
+    try {
+      const loaded = await ghLoadShoppingList();
+      currentShoppingList = loaded ? loaded.data : { items: [] };
+      currentShoppingListSha = loaded ? loaded.sha : null;
+      renderShoppingList(currentShoppingList);
+    } catch (e) {
+      showToast("Erreur : " + e.message, true);
+      $("shopping-list-items").innerHTML = "";
+    }
+  });
+
+  $("btn-back-shopping").addEventListener("click", () => showView("view-list"));
+
+  $("btn-clear-shopping").addEventListener("click", async () => {
+    if (!confirm("Vider la liste de courses ?")) return;
+    try {
+      if (currentShoppingListSha) await ghDeleteFile("shopping-list.json", currentShoppingListSha);
+      currentShoppingList = { items: [] };
+      currentShoppingListSha = null;
+      renderShoppingList(currentShoppingList);
+      showToast("Liste vidée");
+    } catch (e) {
+      showToast("Erreur : " + e.message, true);
+    }
+  });
+
+  $("shopping-list-items").addEventListener("change", (e) => {
+    if (e.target.type !== "checkbox") return;
+    const idx = Number(e.target.dataset.index);
+    if (!currentShoppingList || !currentShoppingList.items[idx]) return;
+    currentShoppingList.items[idx].checked = e.target.checked;
+    renderShoppingList(currentShoppingList);
+    clearTimeout(shoppingSaveTimer);
+    shoppingSaveTimer = setTimeout(() => {
+      ghSaveShoppingList(currentShoppingList).catch(() => {});
+    }, 600);
   });
 
   $("btn-save-recipe").addEventListener("click", saveReviewedRecipe);
