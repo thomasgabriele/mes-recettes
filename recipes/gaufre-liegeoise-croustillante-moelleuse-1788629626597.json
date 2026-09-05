@@ -1,0 +1,92 @@
+{
+  "title": "Gaufre Liégeoise Croustillante & Moelleuse",
+  "category": "",
+  "baseServings": 12,
+  "servings": "12 personnes",
+  "prepTime": "15 minutes",
+  "cookTime": "1 heure",
+  "difficulty": "Moyen",
+  "ingredients": [
+    {
+      "quantity": 250,
+      "unit": "ml",
+      "name": "lait"
+    },
+    {
+      "quantity": 8,
+      "unit": "g",
+      "name": "levure sèche boulangère"
+    },
+    {
+      "quantity": 500,
+      "unit": "g",
+      "name": "farine T55 ou T45"
+    },
+    {
+      "quantity": 35,
+      "unit": "g",
+      "name": "sucre cassonade"
+    },
+    {
+      "quantity": 3,
+      "unit": "cuillères à café",
+      "name": "extrait naturel de vanille"
+    },
+    {
+      "quantity": 2,
+      "unit": "pincées",
+      "name": "sel"
+    },
+    {
+      "quantity": 2,
+      "unit": "",
+      "name": "oeufs"
+    },
+    {
+      "quantity": 250,
+      "unit": "g",
+      "name": "beurre doux ramolli"
+    },
+    {
+      "quantity": 160,
+      "unit": "g",
+      "name": "sucre perlé"
+    }
+  ],
+  "steps": [
+    {
+      "text": "Faire tiédir le lait dans un bol, ajouter la levure, couvrir et laisser reposer 10 minutes pour l'activer.",
+      "tip": ""
+    },
+    {
+      "text": "Dans le bol du robot (ou un large récipient), mélanger la farine, le sucre cassonade et le sel, puis ajouter les oeufs, la vanille et le mélange lait/levure.",
+      "tip": ""
+    },
+    {
+      "text": "Pétrir pendant 5 minutes à vitesse lente, puis incorporer le beurre mou en morceaux et pétrir à nouveau 10 minutes à vitesse lente.",
+      "tip": ""
+    },
+    {
+      "text": "Couvrir le récipient d'un torchon et placer dans un endroit tiède (ou dans un four chauffé à 30°) ; laisser lever la pâte pendant 1h30 jusqu'à ce qu'elle double de volume.",
+      "tip": ""
+    },
+    {
+      "text": "Dégazer la pâte, ajouter le sucre perlé et former de petits pâtons de 100 g chacun légèrement arrondis.",
+      "tip": ""
+    },
+    {
+      "text": "Chauffer le gaufrier (thermostat 6-7 pour le gaufrier Frifri), déposer le pâton et cuire 2 minutes 20, puis retourner et cuire la même durée jusqu'à ce que la gaufre soit bien caramélisée.",
+      "tip": ""
+    },
+    {
+      "text": "Déposer la gaufre sur une grille pour qu'elle tiédisse, puis poursuivre avec les autres pâtons.",
+      "tip": ""
+    }
+  ],
+  "photo": "",
+  "source": {
+    "type": "url",
+    "url": "https://liliebakery.fr/gaufre-liegeoise/"
+  },
+  "createdAt": "2026-09-05T17:33:46.597Z"
+}
