@@ -1,6 +1,6 @@
 {
   "title": "Gaufre Liégeoise Croustillante & Moelleuse",
-  "category": "",
+  "category": "Dessert",
   "baseServings": 12,
   "servings": "12 personnes",
   "prepTime": "15 minutes",
@@ -88,5 +88,6 @@
     "type": "url",
     "url": "https://liliebakery.fr/gaufre-liegeoise/"
   },
-  "createdAt": "2026-09-05T17:33:46.597Z"
+  "createdAt": "2026-09-05T17:33:46.597Z",
+  "updatedAt": "2026-09-05T17:38:27.928Z"
 }
