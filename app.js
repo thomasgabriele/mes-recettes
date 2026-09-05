@@ -11,6 +11,7 @@ const RECIPES_PATH = "recipes";
 let settings = loadSettings();
 let currentRecipes = []; // cache { path, sha, data }
 let pendingReview = null; // { source, data }
+let reviewPhoto = ""; // URL ou data URL de la photo en cours d'édition
 
 /* ---------- Réglages ---------- */
 
@@ -111,7 +112,13 @@ async function ghDeleteFile(path, sha) {
 
 /* ---------- Appels à Claude ---------- */
 
-async function callClaude(contentBlocks) {
+async function callClaudeRaw(contentBlocks, { tools, maxTokens = 2000 } = {}) {
+  const body = {
+    model: CLAUDE_MODEL,
+    max_tokens: maxTokens,
+    messages: [{ role: "user", content: contentBlocks }]
+  };
+  if (tools) body.tools = tools;
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -120,20 +127,40 @@ async function callClaude(contentBlocks) {
       "anthropic-version": "2023-06-01",
       "anthropic-dangerous-direct-browser-access": "true"
     },
-    body: JSON.stringify({
-      model: CLAUDE_MODEL,
-      max_tokens: 2000,
-      messages: [{ role: "user", content: contentBlocks }]
-    })
+    body: JSON.stringify(body)
   });
   if (!res.ok) {
     const errText = await res.text();
     throw new Error(`Claude API : ${res.status} ${errText}`);
   }
   const data = await res.json();
-  const text = data.content.map(b => b.text || "").join("\n");
+  return data.content.map(b => b.text || "").join("\n");
+}
+
+async function callClaude(contentBlocks) {
+  const text = await callClaudeRaw(contentBlocks);
   const cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
-  return JSON.parse(cleaned);
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error("Réponse IA illisible");
+  }
+}
+
+async function findImageViaWebSearch(title) {
+  if (!title) return "";
+  try {
+    const text = await callClaudeRaw([
+      { type: "text", text: `Cherche sur le web une vraie photo du plat "${title}". Réponds UNIQUEMENT avec l'URL directe de l'image (se terminant par .jpg, .jpeg, .png ou .webp), sans aucun autre texte, sans balises markdown. Si tu ne trouves rien de fiable, réponds exactement AUCUNE.` }
+    ], { tools: [{ type: "web_search_20250305", name: "web_search" }], maxTokens: 1024 });
+    const cleaned = text.trim().replace(/^["'\`]+|["'\`]+$/g, "");
+    if (/^https?:\/\/\S+\.(jpg|jpeg|png|webp|gif)(\?\S*)?$/i.test(cleaned)) return cleaned;
+    return "";
+  } catch {
+    return "";
+  }
 }
 
 const EXTRACTION_INSTRUCTIONS = `Tu extrais une recette de cuisine et tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans balises markdown, selon exactement ce schéma :
@@ -173,22 +200,34 @@ async function fetchWithTimeout(url, ms) {
   }
 }
 
+function extractImageUrl(doc, baseUrl) {
+  const meta = doc.querySelector('meta[property="og:image"]') || doc.querySelector('meta[name="twitter:image"]');
+  let src = meta?.getAttribute("content");
+  if (!src) {
+    const img = doc.querySelector("article img, main img, img");
+    src = img?.getAttribute("src");
+  }
+  if (!src) return "";
+  try { return new URL(src, baseUrl).href; } catch { return ""; }
+}
+
 async function fetchPageText(url) {
   const proxies = [
-    `https://thingproxy.freeboard.io/fetch/${url}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    `https://thingproxy.freeboard.io/fetch/${url}`
   ];
   let lastErr;
   for (const proxyUrl of proxies) {
     try {
-      const res = await fetchWithTimeout(proxyUrl, 12000);
-      if (!res.ok) throw new Error(`${res.status}`);
+      const res = await fetchWithTimeout(proxyUrl, 15000);
+      if (!res.ok) throw new Error(`${new URL(proxyUrl).hostname} : ${res.status}`);
       const html = await res.text();
       const doc = new DOMParser().parseFromString(html, "text/html");
+      const imageUrl = extractImageUrl(doc, url);
       doc.querySelectorAll("script, style, nav, footer, header, noscript").forEach(el => el.remove());
       const text = doc.body ? doc.body.innerText : doc.documentElement.textContent;
       const cleaned = text.replace(/\n{2,}/g, "\n").replace(/[ \t]{2,}/g, " ").trim();
-      if (cleaned.length > 200) return cleaned;
+      if (cleaned.length > 200) return { text: cleaned, imageUrl };
       lastErr = new Error("Contenu trop court");
     } catch (e) {
       lastErr = e;
@@ -199,7 +238,7 @@ async function fetchPageText(url) {
 
 /* ---------- Redimensionnement d'image (avant envoi à l'IA) ---------- */
 
-function readAndResizeImage(file, maxWidth = 1400) {
+function readAndResizeImage(file, maxWidth = 1100, quality = 0.8) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("Lecture du fichier impossible"));
@@ -211,8 +250,8 @@ function readAndResizeImage(file, maxWidth = 1400) {
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
         canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-        resolve(dataUrl.split(",")[1]); // base64 sans le préfixe
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve({ base64: dataUrl.split(",")[1], dataUrl });
       };
       img.onerror = () => reject(new Error("Image invalide"));
       img.src = reader.result;
@@ -253,7 +292,8 @@ function renderRecipeGrid(recipes) {
     const card = document.createElement("div");
     card.className = "recipe-card";
     const meta = [r.data.prepTime, r.data.cookTime, r.data.servings].filter(Boolean);
-    card.innerHTML = `<h3>${escapeHtml(r.data.title || "Sans titre")}</h3>
+    const photoHtml = r.data.photo ? `<img class="recipe-card-photo" src="${escapeHtml(r.data.photo)}" alt="">` : "";
+    card.innerHTML = `${photoHtml}<h3>${escapeHtml(r.data.title || "Sans titre")}</h3>
       <div class="recipe-meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join("")}</div>`;
     card.addEventListener("click", () => openRecipeDetail(i));
     grid.appendChild(card);
@@ -277,6 +317,7 @@ function openRecipeDetail(index) {
   ].filter(Boolean);
 
   $("detail-content").innerHTML = `
+    ${d.photo ? `<img class="detail-photo" src="${escapeHtml(d.photo)}" alt="">` : ""}
     <div class="detail-header">
       <h2>${escapeHtml(d.title || "Sans titre")}</h2>
       <div class="detail-meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join("")}</div>
@@ -320,7 +361,23 @@ function resetImportModal() {
   $("import-review").classList.add("hidden");
   $("input-photo").value = "";
   $("input-url").value = "";
+  $("review-photo-file").value = "";
   pendingReview = null;
+  reviewPhoto = "";
+}
+
+function setReviewPhoto(value) {
+  reviewPhoto = value || "";
+  const img = $("review-photo-img");
+  const empty = $("review-photo-empty");
+  if (reviewPhoto) {
+    img.src = reviewPhoto;
+    img.classList.remove("hidden");
+    empty.classList.add("hidden");
+  } else {
+    img.classList.add("hidden");
+    empty.classList.remove("hidden");
+  }
 }
 
 function showReview(data, source) {
@@ -331,6 +388,7 @@ function showReview(data, source) {
   $("review-cook").value = data.cookTime || "";
   $("review-ingredients").value = (data.ingredients || []).join("\n");
   $("review-steps").value = (data.steps || []).join("\n");
+  setReviewPhoto(data.photo || "");
   $("import-loading").classList.add("hidden");
   $("import-review").classList.remove("hidden");
 }
@@ -350,6 +408,7 @@ async function saveReviewedRecipe() {
     cookTime: $("review-cook").value.trim(),
     ingredients: $("review-ingredients").value.split("\n").map(s => s.trim()).filter(Boolean),
     steps: $("review-steps").value.split("\n").map(s => s.trim()).filter(Boolean),
+    photo: reviewPhoto,
     source: pendingReview.source,
     createdAt: now.toISOString()
   };
@@ -415,6 +474,11 @@ function wireEvents() {
     $("import-url-form").classList.remove("hidden");
   });
 
+  $("opt-manual").addEventListener("click", () => {
+    $("import-choice").classList.add("hidden");
+    showReview({}, { type: "manual" });
+  });
+
   $("btn-extract-photo").addEventListener("click", async () => {
     const file = $("input-photo").files[0];
     if (!file) { showToast("Choisis d'abord une photo", true); return; }
@@ -422,9 +486,10 @@ function wireEvents() {
     $("import-loading-text").textContent = "Lecture de la photo…";
     $("import-loading").classList.remove("hidden");
     try {
-      const base64 = await readAndResizeImage(file);
+      const { base64, dataUrl } = await readAndResizeImage(file);
       $("import-loading-text").textContent = "Analyse par l'IA…";
       const data = await extractFromImage(base64, "image/jpeg");
+      data.photo = dataUrl;
       showReview(data, { type: "photo" });
     } catch (e) {
       showToast("Erreur : " + e.message, true);
@@ -439,13 +504,48 @@ function wireEvents() {
     $("import-loading-text").textContent = "Lecture de la page…";
     $("import-loading").classList.remove("hidden");
     try {
-      const pageText = await fetchPageText(url);
+      const { text: pageText, imageUrl } = await fetchPageText(url);
       $("import-loading-text").textContent = "Analyse par l'IA…";
       const data = await extractFromPageText(pageText, url);
+      data.photo = imageUrl || "";
+      if (!data.photo) {
+        $("import-loading-text").textContent = "Recherche d'une photo…";
+        data.photo = await findImageViaWebSearch(data.title);
+      }
       showReview(data, { type: "url", url });
     } catch (e) {
       showToast("Erreur : " + e.message, true);
       resetImportModal();
+    }
+  });
+
+  $("review-photo-file").addEventListener("change", async () => {
+    const file = $("review-photo-file").files[0];
+    if (!file) return;
+    try {
+      const { dataUrl } = await readAndResizeImage(file);
+      setReviewPhoto(dataUrl);
+    } catch (e) {
+      showToast("Erreur : " + e.message, true);
+    }
+  });
+
+  $("btn-find-photo").addEventListener("click", async () => {
+    const title = $("review-title").value.trim();
+    if (!title) { showToast("Indique d'abord un titre", true); return; }
+    const btn = $("btn-find-photo");
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Recherche…";
+    try {
+      const photo = await findImageViaWebSearch(title);
+      if (photo) setReviewPhoto(photo);
+      else showToast("Aucune photo trouvée");
+    } catch (e) {
+      showToast("Erreur : " + e.message, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
     }
   });
 

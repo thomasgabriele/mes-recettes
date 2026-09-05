@@ -95,6 +95,10 @@
           <span class="import-icon">🔗</span>
           <span>Depuis un site web</span>
         </button>
+        <button class="import-option" id="opt-manual">
+          <span class="import-icon">✍️</span>
+          <span>Manuellement</span>
+        </button>
       </div>
 
       <div id="import-photo-form" class="import-form hidden">
@@ -120,6 +124,17 @@
 
       <div id="import-review" class="import-review hidden">
         <p class="modal-intro">Vérifie et corrige si besoin, puis enregistre.</p>
+        <div class="field">
+          <span>Photo</span>
+          <div class="photo-preview-wrap">
+            <img id="review-photo-img" class="photo-preview hidden" alt="">
+            <span id="review-photo-empty" class="photo-empty">Aucune photo</span>
+          </div>
+          <div class="photo-controls">
+            <input type="file" id="review-photo-file" accept="image/*">
+            <button type="button" id="btn-find-photo" class="btn btn-text">🔎 Chercher une photo sur le web</button>
+          </div>
+        </div>
         <label class="field">
           <span>Titre</span>
           <input type="text" id="review-title">

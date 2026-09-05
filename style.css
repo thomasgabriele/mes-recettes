@@ -196,20 +196,41 @@ p { margin: 0; }
 .field-row { display: flex; gap: 10px; }
 .field-row .field { flex: 1; }
 
-.import-choice { display: flex; gap: 12px; }
+.import-choice { display: flex; gap: 10px; flex-wrap: wrap; }
 .import-option {
   flex: 1;
+  min-width: 110px;
   background: var(--cream);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 24px 12px;
+  padding: 20px 10px;
   display: flex; flex-direction: column; align-items: center; gap: 8px;
   cursor: pointer;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
+  text-align: center;
 }
 .import-option:hover { border-color: var(--herb); }
-.import-icon { font-size: 28px; }
+.import-icon { font-size: 26px; }
+
+.photo-preview-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  height: 140px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.photo-preview { width: 100%; height: 100%; object-fit: cover; }
+.photo-empty { color: var(--ink-soft); font-size: 13px; }
+.photo-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.photo-controls input[type="file"] { font-size: 12px; max-width: 160px; }
+.photo-controls .btn-text { font-size: 12px; padding: 4px 0; }
+.recipe-card-photo { width: 100%; height: 110px; object-fit: cover; border-radius: 8px; margin-bottom: 4px; }
+.detail-photo { width: 100%; max-height: 280px; object-fit: cover; border-radius: var(--radius); margin-bottom: 16px; }
 .import-form { margin-top: 16px; }
 .import-loading { text-align: center; padding: 30px 0; color: var(--ink-soft); }
 .spinner {
