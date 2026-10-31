@@ -44,6 +44,7 @@
       <option value="30">≤ 30 min</option>
       <option value="60">≤ 60 min</option>
     </select>
+    <button type="button" id="filter-favorites" class="category-chip fav-chip" aria-pressed="false">☆ Favoris</button>
   </div>
   <div id="category-filters" class="category-filters hidden"></div>
   <div id="difficulty-filters" class="category-filters hidden"></div>
@@ -73,6 +74,44 @@
   </div>
   <div id="shopping-list-items"></div>
 </section>
+
+<section id="view-shared" class="view hidden">
+  <div class="shared-wrap">
+    <button id="btn-shared-back" class="btn btn-text hidden">← Mes recettes</button>
+    <article id="shared-content" class="shared-content"></article>
+    <p class="shared-footer">Recette partagée depuis « Mes Recettes » 🍲</p>
+  </div>
+</section>
+
+<!-- Mode cuisine -->
+<div id="cook-mode" class="cook-mode hidden" role="dialog" aria-modal="true" aria-label="Mode cuisine">
+  <div class="cook-top">
+    <button id="cook-toggle-ing" class="btn btn-text cook-ing-toggle" aria-expanded="false">🥕 Ingrédients</button>
+    <div class="cook-title" id="cook-title"></div>
+    <div class="cook-top-actions">
+      <button id="cook-fullscreen" class="btn btn-icon hidden" title="Plein écran (F)" aria-label="Plein écran">⛶</button>
+      <button id="cook-close" class="btn btn-icon" title="Quitter (Échap)" aria-label="Quitter le mode cuisine">✕</button>
+    </div>
+  </div>
+  <div class="cook-progress"><div id="cook-progress-bar"></div></div>
+  <div class="cook-body">
+    <aside id="cook-ingredients" class="cook-ingredients">
+      <h4>Ingrédients <span id="cook-servings"></span></h4>
+      <ul id="cook-ing-list"></ul>
+      <p class="cook-ing-help">Touche un ingrédient pour le cocher.</p>
+    </aside>
+    <section class="cook-stage" id="cook-stage">
+      <div class="cook-step-count" id="cook-step-count"></div>
+      <p class="cook-step-text" id="cook-step-text"></p>
+      <div class="cook-step-tip hidden" id="cook-step-tip"></div>
+    </section>
+  </div>
+  <div class="cook-nav">
+    <button id="cook-prev" class="btn cook-btn cook-btn-prev">← Précédente</button>
+    <span class="cook-hint">Clavier : ← → pour naviguer · I ingrédients · Échap pour quitter</span>
+    <button id="cook-next" class="btn btn-primary cook-btn">Suivante →</button>
+  </div>
+</div>
 
 <div id="selection-bar" class="selection-bar hidden">
   <span id="selection-count">0 sélectionnée(s)</span>
@@ -234,6 +273,38 @@
         <button id="btn-save-recipe" class="btn btn-primary btn-block">Enregistrer la recette</button>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- Modale : adapter une recette -->
+<div id="modal-adapt" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Adapter la recette</h2>
+      <button class="btn btn-icon" data-close-modal>✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="adapt-form">
+        <p class="modal-intro">L'IA crée une nouvelle version de « <strong id="adapt-recipe-title"></strong> ». L'originale reste intacte. Tu peux combiner plusieurs choix.</p>
+        <div class="adapt-options" id="adapt-options">
+          <button type="button" class="adapt-chip" data-adapt="végétarienne (sans viande ni poisson)">🥦 Végétarienne</button>
+          <button type="button" class="adapt-chip" data-adapt="sans gluten">🌾 Sans gluten</button>
+          <button type="button" class="adapt-chip" data-adapt="sans lactose">🥛 Sans lactose</button>
+          <button type="button" class="adapt-chip" data-adapt="adaptée aux enfants (goûts simples, pas d'alcool ni de piment, portions et présentation pour enfants)">🧒 Version enfant</button>
+          <button type="button" class="adapt-chip" data-adapt="plus légère (moins de matières grasses et de sucre)">🪶 Plus légère</button>
+          <button type="button" class="adapt-chip" data-adapt="plus rapide à préparer">⚡ Plus rapide</button>
+        </div>
+        <label class="field">
+          <span>Ou décris ta demande</span>
+          <input type="text" id="adapt-custom" placeholder="ex : sans four, avec du saumon, version apéro…">
+        </label>
+        <button id="btn-adapt-go" class="btn btn-primary btn-block">✨ Créer la variante</button>
+      </div>
+      <div id="adapt-loading" class="import-loading hidden">
+        <div class="spinner"></div>
+        <p>L'IA adapte la recette…</p>
+      </div>
     </div>
   </div>
 </div>

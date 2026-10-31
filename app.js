@@ -24,6 +24,11 @@ let detailServings = null; // portions actuellement affichées dans le détail
 let currentShoppingList = null; // { items: [...] }
 let currentShoppingListSha = null;
 let shoppingSaveTimer = null;
+let favoritesOnly = false;
+let cookState = null; // { r, step, ratio, checked: Set }
+let wakeLock = null;
+let sharedRecipe = null;
+let adaptTarget = null;
 
 const DIFFICULTY_ORDER = ["Facile", "Moyen", "Difficile"];
 
@@ -116,6 +121,13 @@ async function ghSaveFile(path, jsonData, existingSha) {
   return res.json();
 }
 
+async function updateRecipeFields(r, patch) {
+  const newData = { ...r.data, ...patch };
+  const res = await ghSaveFile(r.path, newData, r.sha);
+  r.data = newData;
+  r.sha = res?.content?.sha || r.sha;
+}
+
 async function ghDeleteFile(path, sha) {
   const res = await fetch(ghContentsUrl(path), {
     method: "DELETE",
@@ -176,8 +188,8 @@ async function callClaudeRaw(contentBlocks, { tools, maxTokens = 2000 } = {}) {
   return data.content.map(b => b.text || "").join("\n");
 }
 
-async function callClaude(contentBlocks) {
-  const text = await callClaudeRaw(contentBlocks);
+async function callClaude(contentBlocks, opts) {
+  const text = await callClaudeRaw(contentBlocks, opts);
   const cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
   try {
     return JSON.parse(cleaned);
@@ -456,12 +468,16 @@ function applyRecipeFilter() {
       const minutes = parsePrepMinutes(r.data.prepTime);
       if (minutes == null || minutes > Number(currentPrepTimeMax)) return false;
     }
+    if (favoritesOnly && !r.data.favorite) return false;
     if (!matchesSearch(r, currentSearchQuery)) return false;
     return true;
   });
 
   const grid = $("recipe-grid");
   grid.innerHTML = "";
+  if (filtered.length === 0) {
+    grid.innerHTML = `<p class="empty-sub list-empty">${favoritesOnly ? "Aucun favori pour l'instant : touche l'étoile ☆ d'une recette pour l'ajouter." : "Aucune recette ne correspond."}</p>`;
+  }
   filtered.forEach((r) => {
     const index = currentRecipes.indexOf(r);
     const card = document.createElement("div");
@@ -478,7 +494,7 @@ function applyRecipeFilter() {
       ${photoHtml}
       <div class="recipe-card-info">
         ${badgesHtml}
-        <h3>${escapeHtml(r.data.title || "Sans titre")}</h3>
+        <h3>${r.data.favorite ? '<span class="card-fav" title="Favori">★</span> ' : ""}${escapeHtml(r.data.title || "Sans titre")}</h3>
         <div class="recipe-meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join("")}</div>
       </div>
     `;
@@ -579,7 +595,12 @@ function closeRecipeDetail() {
   applyRecipeFilter();
 }
 
-function renderRecipeDetailContent(r) {
+function ingredientsHtml(d, ratio) {
+  return (d.ingredients || []).map(ing => `<li>${escapeHtml(formatIngredient(ing, ratio))}</li>`).join("");
+}
+
+function renderRecipeDetailContent(r, container = $("detail-content"), opts = {}) {
+  const readonly = !!opts.readonly;
   const d = r.data;
   const base = getBaseServings(d);
   const ratio = (base && detailServings) ? detailServings / base : 1;
@@ -589,46 +610,330 @@ function renderRecipeDetailContent(r) {
   ].filter(Boolean);
   const categoryHtml = d.category ? badgePill(d.category, categoryColor(d.category)) : "";
   const difficultyHtml = d.difficulty ? badgePill(d.difficulty, DIFFICULTY_COLORS[d.difficulty]) : "";
+  const isVariant = d.source && d.source.type === "variant" && d.source.baseTitle;
+  const hasSteps = (d.steps || []).length > 0;
 
-  $("detail-content").innerHTML = `
+  container.innerHTML = `
     ${d.photo ? `<img class="detail-photo" src="${escapeHtml(d.photo)}" alt="">` : ""}
     <div class="detail-header">
-      ${(categoryHtml || difficultyHtml) ? `<div class="card-badges">${categoryHtml}${difficultyHtml}</div>` : ""}
-      <h2>${escapeHtml(d.title || "Sans titre")}</h2>
+      <div class="detail-title-row">
+        <div class="detail-title-main">
+          ${(categoryHtml || difficultyHtml) ? `<div class="card-badges">${categoryHtml}${difficultyHtml}</div>` : ""}
+          <h2>${escapeHtml(d.title || "Sans titre")}</h2>
+        </div>
+        ${readonly ? "" : `<button type="button" class="fav-toggle${d.favorite ? " on" : ""}" data-act="fav" aria-pressed="${d.favorite ? "true" : "false"}" title="${d.favorite ? "Retirer des favoris" : "Ajouter aux favoris"}">${d.favorite ? "★" : "☆"}</button>`}
+      </div>
       <div class="detail-meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join("")}</div>
       ${d.source && d.source.url ? `<div class="detail-source">Source : <a href="${escapeHtml(d.source.url)}" target="_blank" rel="noopener">${escapeHtml(d.source.url)}</a></div>` : ""}
-      ${base ? `
-        <div class="servings-adjust">
-          <button id="btn-servings-minus" type="button">−</button>
-          <span>${detailServings} personne${detailServings > 1 ? "s" : ""}</span>
-          <button id="btn-servings-plus" type="button">+</button>
-        </div>` : ""}
+      ${isVariant ? `<div class="detail-source">✨ Variante de « ${escapeHtml(d.source.baseTitle)} »${d.source.adaptation ? ` : ${escapeHtml(d.source.adaptation)}` : ""}</div>` : ""}
+      <div class="detail-actions-row">
+        ${base ? `
+          <div class="servings-adjust">
+            <button data-act="minus" type="button" aria-label="Moins de personnes">−</button>
+            <span data-role="servings">${detailServings} personne${detailServings > 1 ? "s" : ""}</span>
+            <button data-act="plus" type="button" aria-label="Plus de personnes">+</button>
+          </div>` : ""}
+        ${hasSteps ? `<button type="button" class="btn btn-primary btn-cook" data-act="cook">👨‍🍳 Mode cuisine</button>` : ""}
+      </div>
     </div>
     <div class="detail-section">
       <h4>INGRÉDIENTS</h4>
-      <ul class="ingredient-list">${(d.ingredients || []).map(ing => `<li>${escapeHtml(formatIngredient(ing, ratio))}</li>`).join("")}</ul>
+      <ul class="ingredient-list" data-role="ingredients">${ingredientsHtml(d, ratio)}</ul>
     </div>
     <div class="detail-section">
       <h4>ÉTAPES</h4>
       <ol class="step-list">${(d.steps || []).map(s => `<li>${escapeHtml(stepText(s))}${stepTip(s) ? `<div class="step-tip">💡 ${escapeHtml(stepTip(s))}</div>` : ""}</li>`).join("")}</ol>
     </div>
+    ${readonly ? "" : `
+    <div class="detail-section notes-section">
+      <h4>MES NOTES</h4>
+      <textarea class="notes-input" rows="3" placeholder="Tes ajustements pour la prochaine fois : moins de sucre, 5 min de plus au four…">${escapeHtml(d.notes || "")}</textarea>
+      <div class="notes-actions hidden">
+        <button type="button" class="btn btn-text" data-act="cancel-notes">Annuler</button>
+        <button type="button" class="btn btn-primary btn-small" data-act="save-notes">Enregistrer la note</button>
+      </div>
+    </div>`}
     <div class="detail-footer">
-      <button class="btn btn-text" id="btn-edit-recipe">✏️ Modifier</button>
-      <button class="btn btn-danger" id="btn-delete-recipe">Supprimer cette recette</button>
+      ${readonly ? `<button type="button" class="btn btn-text" data-act="print">🖨 Imprimer / PDF</button>` : `
+        <button type="button" class="btn btn-text" data-act="adapt">✨ Adapter</button>
+        <button type="button" class="btn btn-text" data-act="share">🔗 Partager</button>
+        <button type="button" class="btn btn-text" data-act="print">🖨 Imprimer / PDF</button>
+        <button type="button" class="btn btn-text" data-act="edit">✏️ Modifier</button>
+        <button type="button" class="btn btn-danger" data-act="delete">Supprimer</button>`}
     </div>
   `;
-  $("btn-delete-recipe").addEventListener("click", () => deleteCurrentRecipe(r));
-  $("btn-edit-recipe").addEventListener("click", () => startEditRecipe(r));
-  if (base) {
-    $("btn-servings-minus").addEventListener("click", () => {
-      detailServings = Math.max(1, detailServings - 1);
-      renderRecipeDetailContent(r);
-    });
-    $("btn-servings-plus").addEventListener("click", () => {
-      detailServings = detailServings + 1;
-      renderRecipeDetailContent(r);
-    });
+
+  const on = (act, fn) => { const el = container.querySelector(`[data-act="${act}"]`); if (el) el.addEventListener("click", fn); };
+  const refreshServings = () => {
+    const ratioNow = (base && detailServings) ? detailServings / base : 1;
+    container.querySelector('[data-role="ingredients"]').innerHTML = ingredientsHtml(d, ratioNow);
+    container.querySelector('[data-role="servings"]').textContent = `${detailServings} personne${detailServings > 1 ? "s" : ""}`;
+  };
+  on("minus", () => { detailServings = Math.max(1, detailServings - 1); refreshServings(); });
+  on("plus", () => { detailServings = detailServings + 1; refreshServings(); });
+  on("cook", () => openCookMode(r));
+  on("print", () => window.print());
+  if (readonly) return;
+
+  on("fav", (e) => toggleFavorite(r, e.currentTarget));
+  on("share", () => shareRecipe(r));
+  on("adapt", () => openAdaptModal(r));
+  on("edit", () => startEditRecipe(r));
+  on("delete", () => deleteCurrentRecipe(r));
+
+  const notesInput = container.querySelector(".notes-input");
+  const notesActions = container.querySelector(".notes-actions");
+  notesInput.addEventListener("input", () => {
+    notesActions.classList.toggle("hidden", notesInput.value === (r.data.notes || ""));
+  });
+  on("cancel-notes", () => { notesInput.value = r.data.notes || ""; notesActions.classList.add("hidden"); });
+  on("save-notes", async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.textContent = "Enregistrement…";
+    try {
+      await updateRecipeFields(r, { notes: notesInput.value.trim() });
+      notesInput.value = r.data.notes;
+      notesActions.classList.add("hidden");
+      showToast("Note enregistrée");
+    } catch (err) {
+      showToast("Erreur : " + err.message, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Enregistrer la note";
+    }
+  });
+}
+
+async function toggleFavorite(r, btn) {
+  const newVal = !r.data.favorite;
+  const paint = (v) => {
+    btn.textContent = v ? "★" : "☆";
+    btn.classList.toggle("on", v);
+    btn.setAttribute("aria-pressed", v ? "true" : "false");
+    btn.title = v ? "Retirer des favoris" : "Ajouter aux favoris";
+  };
+  paint(newVal);
+  btn.disabled = true;
+  try {
+    await updateRecipeFields(r, { favorite: newVal });
+    applyRecipeFilter();
+    showToast(newVal ? "Ajoutée aux favoris" : "Retirée des favoris");
+  } catch (e) {
+    paint(!newVal);
+    showToast("Erreur : " + e.message, true);
+  } finally {
+    btn.disabled = false;
   }
+}
+
+/* ---------- Mode cuisine ---------- */
+
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; });
+    }
+  } catch { /* non supporté ou refusé : l'écran pourra se mettre en veille */ }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+}
+
+function openCookMode(r) {
+  const steps = r.data.steps || [];
+  if (steps.length === 0) { showToast("Cette recette n'a pas d'étapes", true); return; }
+  const base = getBaseServings(r.data);
+  const ratio = (base && detailServings) ? detailServings / base : 1;
+  cookState = { r, step: 0, ratio, checked: new Set() };
+  $("cook-title").textContent = r.data.title || "";
+  $("cook-servings").textContent = base && detailServings ? `· ${detailServings} pers.` : "";
+  renderCookIngredients();
+  renderCookStep();
+  $("cook-ingredients").classList.remove("show");
+  $("cook-toggle-ing").setAttribute("aria-expanded", "false");
+  $("cook-fullscreen").classList.toggle("hidden", !document.fullscreenEnabled);
+  $("cook-mode").classList.remove("hidden");
+  document.body.classList.add("cook-open");
+  requestWakeLock();
+}
+
+function closeCookMode() {
+  if (!cookState) return;
+  cookState = null;
+  $("cook-mode").classList.add("hidden");
+  document.body.classList.remove("cook-open");
+  releaseWakeLock();
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+
+function renderCookIngredients() {
+  const { r, ratio, checked } = cookState;
+  $("cook-ing-list").innerHTML = (r.data.ingredients || []).map((ing, i) =>
+    `<li class="${checked.has(i) ? "done" : ""}" data-index="${i}"><span class="cook-check">${checked.has(i) ? "✓" : ""}</span>${escapeHtml(formatIngredient(ing, ratio))}</li>`
+  ).join("") || "<li>Aucun ingrédient</li>";
+}
+
+function renderCookStep() {
+  const { r, step } = cookState;
+  const steps = r.data.steps;
+  const s = steps[step];
+  const total = steps.length;
+  $("cook-step-count").textContent = `Étape ${step + 1} sur ${total}`;
+  $("cook-step-text").textContent = stepText(s);
+  const tip = stepTip(s);
+  $("cook-step-tip").textContent = tip ? "💡 " + tip : "";
+  $("cook-step-tip").classList.toggle("hidden", !tip);
+  $("cook-progress-bar").style.width = `${((step + 1) / total) * 100}%`;
+  $("cook-prev").disabled = step === 0;
+  $("cook-next").textContent = step === total - 1 ? "Terminé ✓" : "Suivante →";
+  const stage = $("cook-stage");
+  stage.classList.remove("enter");
+  void stage.offsetWidth;
+  stage.classList.add("enter");
+  stage.scrollTop = 0;
+}
+
+function cookGo(delta) {
+  if (!cookState) return;
+  const total = cookState.r.data.steps.length;
+  const next = cookState.step + delta;
+  if (next >= total) { closeCookMode(); showToast("Bon appétit ! 🍽"); return; }
+  if (next < 0) return;
+  cookState.step = next;
+  renderCookStep();
+}
+
+function toggleCookIngredients() {
+  const panel = $("cook-ingredients");
+  const show = !panel.classList.contains("show");
+  panel.classList.toggle("show", show);
+  $("cook-toggle-ing").setAttribute("aria-expanded", show ? "true" : "false");
+}
+
+/* ---------- Adapter une recette avec l'IA ---------- */
+
+function openAdaptModal(r) {
+  if (!settings.anthropicKey) { showToast("Ajoute d'abord ta clé API dans les réglages", true); return; }
+  adaptTarget = r;
+  $("adapt-recipe-title").textContent = r.data.title || "Sans titre";
+  document.querySelectorAll(".adapt-chip").forEach(c => c.classList.remove("active"));
+  $("adapt-custom").value = "";
+  $("adapt-form").classList.remove("hidden");
+  $("adapt-loading").classList.add("hidden");
+  openModal("modal-adapt");
+}
+
+async function runAdaptation() {
+  const r = adaptTarget;
+  if (!r) return;
+  const wishes = [...document.querySelectorAll(".adapt-chip.active")].map(c => c.dataset.adapt);
+  const custom = $("adapt-custom").value.trim();
+  if (custom) wishes.push(custom);
+  if (wishes.length === 0) { showToast("Choisis au moins une adaptation", true); return; }
+  const labels = [...document.querySelectorAll(".adapt-chip.active")].map(c => c.textContent.replace(/^\S+\s/, ""));
+  if (custom) labels.push(custom);
+
+  const d = r.data;
+  const source = {
+    title: d.title, category: d.category, baseServings: getBaseServings(d),
+    prepTime: d.prepTime, cookTime: d.cookTime, difficulty: d.difficulty,
+    ingredients: (d.ingredients || []).map(ingredientObj),
+    steps: (d.steps || []).map(s => ({ text: stepText(s), tip: stepTip(s) }))
+  };
+
+  $("adapt-form").classList.add("hidden");
+  $("adapt-loading").classList.remove("hidden");
+  try {
+    const data = await callClaude([{ type: "text", text: `Voici une recette de cuisine au format JSON :
+${JSON.stringify(source)}
+
+Crée une variante de cette recette qui soit : ${wishes.join(" ; ")}.
+Remplace les ingrédients incompatibles par de bons équivalents faciles à trouver en France, ajuste les quantités, les étapes, les temps et la difficulté si nécessaire, et garde l'esprit du plat. Donne un titre court qui indique l'adaptation (ex : "Lasagnes végétariennes").
+Pour chaque étape, utilise un objet {"text","tip"} : garde les astuces d'origine utiles et ajoute dans "tip" une précision liée à l'adaptation quand c'est pertinent, sinon "".
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour ni balises markdown, selon ce schéma :
+{"title": "string", "category": "string", "baseServings": nombre ou null, "prepTime": "string", "cookTime": "string", "difficulty": "Facile" ou "Moyen" ou "Difficile" ou "", "ingredients": [{"quantity": nombre ou null, "unit": "string", "name": "string"}], "steps": [{"text": "string", "tip": "string"}], "adaptationSummary": "une phrase courte qui résume les principaux changements"}` }], { maxTokens: 4000 });
+
+    closeModal("modal-adapt");
+    resetImportModal();
+    data.photo = d.photo || "";
+    data.category = data.category || d.category || "";
+    showReview(data, {
+      type: "variant",
+      baseTitle: d.title || "",
+      basePath: r.path,
+      adaptation: data.adaptationSummary || labels.join(", ")
+    });
+    $("import-choice").classList.add("hidden");
+    $("import-modal-title").textContent = "Vérifie la variante";
+    $("btn-save-recipe").textContent = "Enregistrer la variante";
+    openModal("modal-import");
+  } catch (e) {
+    showToast("Erreur : " + e.message, true);
+    $("adapt-form").classList.remove("hidden");
+    $("adapt-loading").classList.add("hidden");
+  }
+}
+
+/* ---------- Partage ---------- */
+
+function recipeShareUrl(r) {
+  const file = r.path.split("/").pop().replace(/\.json$/, "");
+  return `${location.origin}${location.pathname}#recette=${encodeURIComponent(file)}`;
+}
+
+async function shareRecipe(r) {
+  const url = recipeShareUrl(r);
+  const title = r.data.title || "Recette";
+  if (navigator.share) {
+    try { await navigator.share({ title, text: `${title} 🍲`, url }); return; }
+    catch (e) { if (e.name === "AbortError") return; }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast("Lien copié : colle-le dans un message");
+  } catch {
+    window.prompt("Copie ce lien :", url);
+  }
+}
+
+function sharedFileFromHash() {
+  const m = location.hash.match(/^#recette=([a-z0-9-]+)$/i);
+  return m ? m[1] : null;
+}
+
+async function openSharedFromHash() {
+  const file = sharedFileFromHash();
+  if (!file) return false;
+  document.body.classList.add("shared-mode");
+  showView("view-shared");
+  $("btn-shared-back").classList.toggle("hidden", !hasSettings());
+  $("shared-content").innerHTML = "<p class='empty-sub'>Chargement de la recette…</p>";
+  try {
+    const path = `${RECIPES_PATH}/${file}.json`;
+    const res = await fetch(`${path}?t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(res.status === 404 ? "Recette introuvable. Si elle vient d'être créée, réessaie dans une minute." : `Erreur ${res.status}`);
+    const data = await res.json();
+    sharedRecipe = { path, sha: null, data };
+    detailServings = getBaseServings(data);
+    renderRecipeDetailContent(sharedRecipe, $("shared-content"), { readonly: true });
+    document.title = `${data.title || "Recette"} · Mes Recettes`;
+  } catch (e) {
+    $("shared-content").innerHTML = `<p class='empty-sub'>${escapeHtml(e.message)}</p>`;
+  }
+  return true;
+}
+
+function leaveSharedView() {
+  sharedRecipe = null;
+  document.body.classList.remove("shared-mode");
+  document.title = "Mes Recettes";
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  showView("view-list");
+  if (!hasSettings()) { openModal("modal-settings"); $("loading-state").classList.add("hidden"); }
+  else if (currentRecipes.length === 0) refreshRecipeList();
 }
 
 async function deleteCurrentRecipe(r) {
@@ -795,6 +1100,10 @@ async function saveReviewedRecipe() {
     source: pendingReview.source,
     createdAt: editing ? editing.createdAt : now.toISOString()
   };
+  if (editing) {
+    if (pendingReview.data.favorite) recipe.favorite = true;
+    if (pendingReview.data.notes) recipe.notes = pendingReview.data.notes;
+  }
   if (editing) recipe.updatedAt = now.toISOString();
 
   try {
@@ -810,7 +1119,10 @@ async function saveReviewedRecipe() {
     showToast("Erreur : " + e.message, true);
   } finally {
     $("btn-save-recipe").disabled = false;
-    $("btn-save-recipe").textContent = editing ? "Enregistrer les modifications" : "Enregistrer la recette";
+    if (pendingReview) {
+      $("btn-save-recipe").textContent = editing ? "Enregistrer les modifications"
+        : (pendingReview.source && pendingReview.source.type === "variant" ? "Enregistrer la variante" : "Enregistrer la recette");
+    }
   }
 }
 
@@ -1170,12 +1482,79 @@ function wireEvents() {
   });
 
   $("btn-save-recipe").addEventListener("click", saveReviewedRecipe);
+
+  // Favoris
+  $("filter-favorites").addEventListener("click", () => {
+    favoritesOnly = !favoritesOnly;
+    const b = $("filter-favorites");
+    b.classList.toggle("active", favoritesOnly);
+    b.setAttribute("aria-pressed", favoritesOnly ? "true" : "false");
+    b.textContent = favoritesOnly ? "★ Favoris" : "☆ Favoris";
+    applyRecipeFilter();
+  });
+
+  // Mode cuisine
+  $("cook-close").addEventListener("click", closeCookMode);
+  $("cook-prev").addEventListener("click", () => cookGo(-1));
+  $("cook-next").addEventListener("click", () => cookGo(1));
+  $("cook-toggle-ing").addEventListener("click", toggleCookIngredients);
+  $("cook-fullscreen").addEventListener("click", () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else $("cook-mode").requestFullscreen().catch(() => {});
+  });
+  $("cook-ing-list").addEventListener("click", (e) => {
+    const li = e.target.closest("li[data-index]");
+    if (!li || !cookState) return;
+    const i = Number(li.dataset.index);
+    if (cookState.checked.has(i)) cookState.checked.delete(i); else cookState.checked.add(i);
+    renderCookIngredients();
+  });
+  let touchX = null, touchY = null;
+  $("cook-stage").addEventListener("touchstart", (e) => {
+    touchX = e.touches[0].clientX; touchY = e.touches[0].clientY;
+  }, { passive: true });
+  $("cook-stage").addEventListener("touchend", (e) => {
+    if (touchX == null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    const dy = e.changedTouches[0].clientY - touchY;
+    touchX = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) cookGo(dx < 0 ? 1 : -1);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (!cookState) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) { e.preventDefault(); cookGo(1); }
+    else if (["ArrowLeft", "PageUp", "Backspace"].includes(e.key)) { e.preventDefault(); cookGo(-1); }
+    else if (e.key === "Escape") { if (!document.fullscreenElement) closeCookMode(); }
+    else if (e.key === "i" || e.key === "I") toggleCookIngredients();
+    else if ((e.key === "f" || e.key === "F") && document.fullscreenEnabled) $("cook-fullscreen").click();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (cookState && document.visibilityState === "visible") requestWakeLock();
+  });
+
+  // Adapter
+  $("adapt-options").addEventListener("click", (e) => {
+    const chip = e.target.closest(".adapt-chip");
+    if (chip) chip.classList.toggle("active");
+  });
+  $("btn-adapt-go").addEventListener("click", runAdaptation);
+  $("adapt-custom").addEventListener("keydown", (e) => { if (e.key === "Enter") runAdaptation(); });
+
+  // Vue partagée
+  $("btn-shared-back").addEventListener("click", leaveSharedView);
+  window.addEventListener("hashchange", () => {
+    if (sharedFileFromHash()) openSharedFromHash();
+    else if (document.body.classList.contains("shared-mode")) leaveSharedView();
+  });
 }
 
 /* ---------- Démarrage ---------- */
 
 wireEvents();
-if (!hasSettings()) {
+if (sharedFileFromHash()) {
+  openSharedFromHash();
+} else if (!hasSettings()) {
   openModal("modal-settings");
   $("loading-state").classList.add("hidden");
 } else {
