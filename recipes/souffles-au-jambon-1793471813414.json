@@ -1,0 +1,67 @@
+{
+  "title": "Soufflés au jambon",
+  "category": "",
+  "baseServings": 6,
+  "servings": "6 personnes",
+  "prepTime": "20 mn",
+  "cookTime": "30 mn",
+  "difficulty": "Moyen",
+  "ingredients": [
+    {
+      "quantity": 250,
+      "unit": "g",
+      "name": "maigre de jambon cuit"
+    },
+    {
+      "quantity": 30,
+      "unit": "g",
+      "name": "beurre"
+    },
+    {
+      "quantity": 0.5,
+      "unit": "litre",
+      "name": "sauce Béchamel"
+    },
+    {
+      "quantity": 1,
+      "unit": "pincée",
+      "name": "paprika"
+    },
+    {
+      "quantity": 3,
+      "unit": "",
+      "name": "œufs"
+    }
+  ],
+  "steps": [
+    {
+      "text": "Pilez finement le jambon avec le beurre, puis passez au tamis fin.",
+      "tip": ""
+    },
+    {
+      "text": "Mettez la purée obtenue et le paprika dans la béchamel bien chaude.",
+      "tip": ""
+    },
+    {
+      "text": "Ajoutez les 3 jaunes d'œufs, puis les blancs battus en neige bien ferme en prenant grand soin de ne pas les faire affaisser.",
+      "tip": ""
+    },
+    {
+      "text": "Dressez dans une timbale à soufflé beurrée ou dans des petites cassolettes en porcelaine.",
+      "tip": ""
+    },
+    {
+      "text": "Faites cuire au four à chaleur moyenne.",
+      "tip": ""
+    },
+    {
+      "text": "Servez immédiatement, l'appareil doublant son volume hors de la timbale.",
+      "tip": ""
+    }
+  ],
+  "photo": "",
+  "source": {
+    "type": "photo"
+  },
+  "createdAt": "2026-10-31T18:36:53.414Z"
+}
