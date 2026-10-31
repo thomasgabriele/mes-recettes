@@ -1,0 +1,144 @@
+{
+  "title": "Bœuf Bourguignon",
+  "category": "",
+  "baseServings": 4,
+  "servings": "4 personnes",
+  "prepTime": "20 min",
+  "cookTime": "3 h 00",
+  "difficulty": "Moyen",
+  "ingredients": [
+    {
+      "quantity": 1,
+      "unit": "kg",
+      "name": "paleron de bœuf"
+    },
+    {
+      "quantity": 125,
+      "unit": "g",
+      "name": "lard"
+    },
+    {
+      "quantity": 12,
+      "unit": "",
+      "name": "petits oignons"
+    },
+    {
+      "quantity": 60,
+      "unit": "g",
+      "name": "beurre"
+    },
+    {
+      "quantity": 500,
+      "unit": "g",
+      "name": "carottes"
+    },
+    {
+      "quantity": 1,
+      "unit": "brindille",
+      "name": "thym"
+    },
+    {
+      "quantity": 1,
+      "unit": "feuille",
+      "name": "laurier"
+    },
+    {
+      "quantity": 2,
+      "unit": "branches",
+      "name": "céleri"
+    },
+    {
+      "quantity": 4,
+      "unit": "brins",
+      "name": "persil"
+    },
+    {
+      "quantity": 1,
+      "unit": "cuillerée à soupe",
+      "name": "farine"
+    },
+    {
+      "quantity": 1,
+      "unit": "cuillerée à soupe",
+      "name": "concentré de tomate"
+    },
+    {
+      "quantity": 1,
+      "unit": "l",
+      "name": "bon vin rouge"
+    },
+    {
+      "quantity": 2,
+      "unit": "",
+      "name": "gousses d'ail"
+    },
+    {
+      "quantity": null,
+      "unit": "",
+      "name": "sel / poivre"
+    }
+  ],
+  "steps": [
+    {
+      "text": "Demandez à votre boucher de débiter la viande en morceaux de la grosseur d'un œuf.",
+      "tip": ""
+    },
+    {
+      "text": "Pensez à sortir la viande du réfrigérateur 1h30 au moins avant sa mise en cuisson.",
+      "tip": ""
+    },
+    {
+      "text": "Enlevez la couenne du lard et coupez-le en dés. Épluchez les oignons, laissez-les entiers.",
+      "tip": ""
+    },
+    {
+      "text": "Dans une cocotte, faites fondre le beurre, ajoutez les oignons et le lard, laissez revenir tout en remuant avec une cuillère en bois 2 ou 3 min.",
+      "tip": ""
+    },
+    {
+      "text": "Mettez la viande, auparavant salée et poivrée au moulin, et faites dorer sur chaque face.",
+      "tip": ""
+    },
+    {
+      "text": "Pendant que la viande est en train de dorer, épluchez les carottes, passez-les rapidement sous l'eau fraîche et coupez-les en bâtonnets de 5 cm environ, ajoutez-les à la viande.",
+      "tip": ""
+    },
+    {
+      "text": "Lavez soigneusement le persil et le céleri, ôtez les parties ligneuses du céleri, puis liez ensemble thym, laurier, persil et céleri que vous ajoutez également à la viande.",
+      "tip": ""
+    },
+    {
+      "text": "Laissez revenir le tout 30 min environ, puis retirez la viande que vous gardez au chaud.",
+      "tip": ""
+    },
+    {
+      "text": "Ajoutez la farine dans le plat de cuisson, remuez bien avec une cuillère en bois ; quand la farine prend de la couleur, ajoutez le concentré de tomate, remuez de nouveau.",
+      "tip": ""
+    },
+    {
+      "text": "Délayez le tout avec le vin rouge versé petit à petit. Salez, poivrez au moulin.",
+      "tip": ""
+    },
+    {
+      "text": "Ajoutez les deux gousses d'ail écrasées après les avoir épluchées. Continuez à remuer avec une cuillère en bois.",
+      "tip": ""
+    },
+    {
+      "text": "Dès que vous aurez obtenu une sauce lisse, remettez la viande dans la cocotte, couvrez et laissez cuire 2h30 environ à feu très doux.",
+      "tip": ""
+    },
+    {
+      "text": "15 min avant la fin de la cuisson, mettez les assiettes à chauffer au four et, si vous voulez, un plat de service creux, mais le bœuf bourguignon peut très bien se servir dans son plat de cuisson.",
+      "tip": ""
+    },
+    {
+      "text": "Vous pouvez l'accompagner de pommes vapeur ou d'une galette de pommes de terre poêlée.",
+      "tip": ""
+    }
+  ],
+  "photo": "https://commons.wikimedia.org/wiki/Special:FilePath/Boeuf_Bourguignon_Paris_Beaubourg.jpg",
+  "source": {
+    "type": "photo"
+  },
+  "createdAt": "2026-10-31T18:29:26.308Z"
+}
