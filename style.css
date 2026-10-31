@@ -458,3 +458,11 @@ p { margin: 0; }
   .field-row { flex-direction: column; }
   .brand h1 { font-size: 18px; }
 }
+
+/* Import photo : appareil photo / photothèque */
+.visually-hidden { position:absolute; width:1px; height:1px; opacity:0; overflow:hidden; pointer-events:none; }
+.photo-source-buttons { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+.photo-selected { margin-bottom:14px; text-align:center; }
+.photo-selected img { max-width:100%; max-height:220px; border-radius:10px; border:1px solid var(--line); object-fit:contain; }
+.photo-selected .btn-text { display:block; margin:6px auto 0; font-size:13px; }
+#btn-extract-photo:disabled { opacity:.5; cursor:not-allowed; }

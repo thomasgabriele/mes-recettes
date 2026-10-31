@@ -645,6 +645,31 @@ async function deleteCurrentRecipe(r) {
 
 /* ---------- Import : flux commun ---------- */
 
+let selectedPhotoFile = null;
+
+function setSelectedPhoto(file) {
+  if (!file) return;
+  selectedPhotoFile = file;
+  const img = $("photo-selected-img");
+  if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+  const url = URL.createObjectURL(file);
+  img.dataset.url = url;
+  img.src = url;
+  $("photo-selected").classList.remove("hidden");
+  $("btn-extract-photo").disabled = false;
+}
+
+function clearSelectedPhoto() {
+  selectedPhotoFile = null;
+  const img = $("photo-selected-img");
+  if (img.dataset.url) { URL.revokeObjectURL(img.dataset.url); img.dataset.url = ""; }
+  img.removeAttribute("src");
+  $("photo-selected").classList.add("hidden");
+  $("btn-extract-photo").disabled = true;
+  $("input-photo").value = "";
+  $("input-camera").value = "";
+}
+
 function resetImportModal() {
   $("import-modal-title").textContent = "Importer une recette";
   $("import-choice").classList.remove("hidden");
@@ -652,7 +677,7 @@ function resetImportModal() {
   $("import-url-form").classList.add("hidden");
   $("import-loading").classList.add("hidden");
   $("import-review").classList.add("hidden");
-  $("input-photo").value = "";
+  clearSelectedPhoto();
   $("input-url").value = "";
   $("review-photo-file").value = "";
   pendingReview = null;
@@ -935,8 +960,14 @@ function wireEvents() {
     showReview({ ingredients: [{ quantity: "", unit: "", name: "" }], steps: [{ text: "", tip: "" }] }, { type: "manual" });
   });
 
+  $("btn-take-photo").addEventListener("click", () => $("input-camera").click());
+  $("btn-pick-photo").addEventListener("click", () => $("input-photo").click());
+  $("input-camera").addEventListener("change", (e) => setSelectedPhoto(e.target.files[0]));
+  $("input-photo").addEventListener("change", (e) => setSelectedPhoto(e.target.files[0]));
+  $("btn-remove-photo").addEventListener("click", clearSelectedPhoto);
+
   $("btn-extract-photo").addEventListener("click", async () => {
-    const file = $("input-photo").files[0];
+    const file = selectedPhotoFile;
     if (!file) { showToast("Choisis d'abord une photo", true); return; }
     $("import-photo-form").classList.add("hidden");
     $("import-loading-text").textContent = "Lecture de la photo…";

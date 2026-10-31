@@ -144,11 +144,23 @@
       </div>
 
       <div id="import-photo-form" class="import-form hidden">
-        <label class="field">
-          <span>Photo de la recette</span>
-          <input type="file" id="input-photo" accept="image/*" capture="environment">
-        </label>
-        <button id="btn-extract-photo" class="btn btn-primary btn-block">Analyser la photo</button>
+        <div class="photo-source-buttons">
+          <button type="button" id="btn-take-photo" class="import-option">
+            <span class="import-icon">📸</span>
+            <span>Prendre une photo</span>
+          </button>
+          <button type="button" id="btn-pick-photo" class="import-option">
+            <span class="import-icon">🖼</span>
+            <span>Choisir une image</span>
+          </button>
+        </div>
+        <input type="file" id="input-camera" accept="image/*" capture="environment" class="visually-hidden">
+        <input type="file" id="input-photo" accept="image/*" class="visually-hidden">
+        <div id="photo-selected" class="photo-selected hidden">
+          <img id="photo-selected-img" alt="Aperçu de la photo">
+          <button type="button" id="btn-remove-photo" class="btn btn-text">✕ Changer de photo</button>
+        </div>
+        <button id="btn-extract-photo" class="btn btn-primary btn-block" disabled>Analyser la photo</button>
       </div>
 
       <div id="import-url-form" class="import-form hidden">
