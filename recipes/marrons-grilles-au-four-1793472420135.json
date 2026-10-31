@@ -1,0 +1,36 @@
+{
+  "title": "Marrons grillés au four",
+  "category": "",
+  "baseServings": 8,
+  "servings": "8 personnes",
+  "prepTime": "15 min",
+  "cookTime": "30 min",
+  "difficulty": "Facile",
+  "ingredients": [
+    {
+      "quantity": 1,
+      "unit": "kg",
+      "name": "marrons"
+    }
+  ],
+  "steps": [
+    {
+      "text": "Faire tremper les marrons environ 1h dans de l'eau froide.",
+      "tip": ""
+    },
+    {
+      "text": "Les inciser prudemment en croix puis les répartir sur une plaque avec un récipient réfractaire contenant 1 dl d'eau.",
+      "tip": ""
+    },
+    {
+      "text": "Glisser au milieu du four et régler celui-ci sur 250°C, chaleur tournante. Faire cuire environ 25 min. À mi-cuisson, verser l'eau de la tasse sur la plaque à l'aide de gants de cuisine et poursuivre la cuisson.",
+      "tip": ""
+    }
+  ],
+  "photo": "https://commons.wikimedia.org/wiki/Special:FilePath/Chestnuts_roasted.jpg",
+  "source": {
+    "type": "url",
+    "url": "https://migusto.migros.ch/fr/recettes/marrons-grilles-au-four"
+  },
+  "createdAt": "2026-10-31T18:47:00.135Z"
+}
