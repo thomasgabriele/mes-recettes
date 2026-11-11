@@ -1,0 +1,116 @@
+{
+  "title": "Hachis parmentier",
+  "category": "",
+  "baseServings": 4,
+  "servings": "4 personnes",
+  "prepTime": "20 à 30 mn",
+  "cookTime": "1 h 15",
+  "difficulty": "Moyen",
+  "ingredients": [
+    {
+      "quantity": 4,
+      "unit": "",
+      "name": "petits oignons"
+    },
+    {
+      "quantity": 300,
+      "unit": "g",
+      "name": "restes de viandes cuites (bœuf, porc, veau, poulet, de préférence mélangés)"
+    },
+    {
+      "quantity": null,
+      "unit": "",
+      "name": "Concentré de tomate"
+    },
+    {
+      "quantity": 50,
+      "unit": "g",
+      "name": "beurre"
+    },
+    {
+      "quantity": null,
+      "unit": "",
+      "name": "Sel, poivre"
+    },
+    {
+      "quantity": 1,
+      "unit": "kg",
+      "name": "pommes de terre"
+    },
+    {
+      "quantity": 50,
+      "unit": "cl",
+      "name": "lait environ"
+    },
+    {
+      "quantity": 1,
+      "unit": "",
+      "name": "œuf entier"
+    },
+    {
+      "quantity": null,
+      "unit": "",
+      "name": "Noix de muscade"
+    },
+    {
+      "quantity": 50,
+      "unit": "g",
+      "name": "gruyère râpé"
+    }
+  ],
+  "steps": [
+    {
+      "text": "Éplucher les pommes de terre, les laver puis les mettre à cuire dans 2 litres d'eau chaude salée pendant 30 minutes environ.",
+      "tip": ""
+    },
+    {
+      "text": "Vérifier la cuisson avec un couteau pointu, puis égoutter les pommes de terre.",
+      "tip": ""
+    },
+    {
+      "text": "Faire bouillir le lait.",
+      "tip": ""
+    },
+    {
+      "text": "Passer les pommes de terre au moulin à légumes à main, ajouter le lait chaud tout en remuant avec un fouet pour obtenir une purée assez claire. Laisser tiédir.",
+      "tip": ""
+    },
+    {
+      "text": "Mettre le four à chauffer à 180°C (th. 6).",
+      "tip": ""
+    },
+    {
+      "text": "Éplucher les oignons, les poser sur une planche, couper la viande en petits morceaux et hacher grossièrement le tout, au hachoir à viande à main de préférence.",
+      "tip": ""
+    },
+    {
+      "text": "Mettre la farce dans un récipient, ajouter le concentré de tomate, saler, poivrer au moulin, mettre en réserve.",
+      "tip": ""
+    },
+    {
+      "text": "Dès que la purée est tiède, ajouter l'œuf, râper un peu de noix de muscade, ajouter le gruyère râpé, mélanger.",
+      "tip": ""
+    },
+    {
+      "text": "Beurrer un plat à gratin en terre, en porcelaine à feu ou en fonte émaillée.",
+      "tip": ""
+    },
+    {
+      "text": "Verser la moitié de la purée dans le fond du plat, étaler bien, verser la farce par-dessus, la répartir également, puis ajouter le reste de la purée que vous finirez d'étaler avec une fourchette en l'appuyant un peu pour former un dessin.",
+      "tip": ""
+    },
+    {
+      "text": "Napper le hachis d'une sauce tomate légère, ou le saupoudrer d'un peu de gruyère râpé, ou simplement le parsemer de quelques parcelles de beurre avant de l'enfourner.",
+      "tip": ""
+    },
+    {
+      "text": "Mettre au four pendant 45 minutes environ.",
+      "tip": ""
+    }
+  ],
+  "photo": "https://commons.wikimedia.org/wiki/Special:FilePath/Hachis_parmentier_01.jpg",
+  "source": {
+    "type": "photo"
+  },
+  "createdAt": "2026-11-11T09:44:38.716Z"
+}
