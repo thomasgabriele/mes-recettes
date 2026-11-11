@@ -1,0 +1,94 @@
+{
+  "title": "Omelette soufflée à la vanille",
+  "category": "",
+  "baseServings": 4,
+  "servings": "4 personnes",
+  "prepTime": "25 min",
+  "cookTime": "10 à 15 min",
+  "difficulty": "Moyen",
+  "ingredients": [
+    {
+      "quantity": 8,
+      "unit": "",
+      "name": "jaunes d'œufs"
+    },
+    {
+      "quantity": 4,
+      "unit": "cuillères à soupe",
+      "name": "sucre"
+    },
+    {
+      "quantity": 1,
+      "unit": "",
+      "name": "gousse de vanille"
+    },
+    {
+      "quantity": 8,
+      "unit": "",
+      "name": "blancs d'œufs"
+    },
+    {
+      "quantity": 1,
+      "unit": "",
+      "name": "prise de sel"
+    },
+    {
+      "quantity": 1,
+      "unit": "",
+      "name": "trait de rhum"
+    },
+    {
+      "quantity": 100,
+      "unit": "g",
+      "name": "beurre"
+    },
+    {
+      "quantity": null,
+      "unit": "",
+      "name": "sucre glace"
+    }
+  ],
+  "steps": [
+    {
+      "text": "Dans une terrine, mélanger au fouet les jaunes d'œufs, le sucre et les grains de vanille.",
+      "tip": ""
+    },
+    {
+      "text": "Monter en neige les blancs d'œufs et le sel.",
+      "tip": ""
+    },
+    {
+      "text": "Mettre le four à chauffer.",
+      "tip": ""
+    },
+    {
+      "text": "Ajouter avec précaution les jaunes d'œufs aux blancs battus, puis le rhum.",
+      "tip": ""
+    },
+    {
+      "text": "Beurrer un plat allant au four et y verser la préparation.",
+      "tip": ""
+    },
+    {
+      "text": "Faire quelques décorations sur la surface avec une fourchette par exemple.",
+      "tip": ""
+    },
+    {
+      "text": "Glisser au four durant 10 à 15 minutes à 180 °C (th. 6) en veillant que la coloration ne se fasse pas trop brutalement.",
+      "tip": ""
+    },
+    {
+      "text": "La saupoudrer de sucre glace puis la repasser très rapidement au four pour caraméliser légèrement la surface.",
+      "tip": ""
+    },
+    {
+      "text": "Servir immédiatement.",
+      "tip": ""
+    }
+  ],
+  "photo": "",
+  "source": {
+    "type": "photo"
+  },
+  "createdAt": "2026-11-11T12:51:26.196Z"
+}
