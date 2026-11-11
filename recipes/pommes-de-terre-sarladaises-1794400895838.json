@@ -1,0 +1,75 @@
+{
+  "title": "Pommes de terre sarladaises",
+  "category": "",
+  "baseServings": 4,
+  "servings": "4 personnes",
+  "prepTime": "20 min",
+  "cookTime": "15 min",
+  "difficulty": "Facile",
+  "ingredients": [
+    {
+      "quantity": 800,
+      "unit": "g",
+      "name": "pommes de terre (BF 15)"
+    },
+    {
+      "quantity": 80,
+      "unit": "g",
+      "name": "graisse d'oie"
+    },
+    {
+      "quantity": 3,
+      "unit": "",
+      "name": "gousses d'ail"
+    },
+    {
+      "quantity": 1,
+      "unit": "",
+      "name": "bouquet de persil plat"
+    },
+    {
+      "quantity": null,
+      "unit": "",
+      "name": "Sel, poivre"
+    }
+  ],
+  "steps": [
+    {
+      "text": "Éplucher les pommes de terre, les couper en très fines rondelles, les laver, les sécher très soigneusement.",
+      "tip": ""
+    },
+    {
+      "text": "Préchauffer une grande poêle en fonte à feu vif. Lorsqu'elle est bien chaude, ajouter la graisse d'oie et la laisser chauffer.",
+      "tip": ""
+    },
+    {
+      "text": "Y jeter les rondelles de pommes de terre. Les remuer de temps en temps et les laisser cuire environ 10 minutes.",
+      "tip": ""
+    },
+    {
+      "text": "Effeuiller et hacher le persil. Éplucher et hacher très finement l'ail. Mélanger ce hachis au persil.",
+      "tip": ""
+    },
+    {
+      "text": "En fin de cuisson, saler et poivrer les pommes de terre.",
+      "tip": ""
+    },
+    {
+      "text": "Les saupoudrer du hachis d'ail et de persil.",
+      "tip": ""
+    },
+    {
+      "text": "Servir immédiatement avec le confit.",
+      "tip": ""
+    },
+    {
+      "text": "On peut au lieu de hacher l'ail et de le servir cru, faire cuire les gousses entièrement non épluchées, avec les pommes de terre qu'elles parfumeront ainsi.",
+      "tip": ""
+    }
+  ],
+  "photo": "https://commons.wikimedia.org/wiki/Special:FilePath/Confitdecanard.jpg",
+  "source": {
+    "type": "photo"
+  },
+  "createdAt": "2026-11-11T12:41:35.838Z"
+}
